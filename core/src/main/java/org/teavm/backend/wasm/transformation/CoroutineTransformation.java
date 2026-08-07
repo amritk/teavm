@@ -80,35 +80,37 @@ public class CoroutineTransformation {
     }
 
     public void transform(WasmFunction function) {
-        currentFunction = function;
-        collector = new SuspensionPointCollector();
-        collector.visitMany(function.getBody());
-        var originalLocals = function.getLocalVariables().size();
-        fiberLocal = new WasmLocal(classInfoProvider.getClassInfo(FIBER).getType(), "coroutine$fiber");
-        stateLocal = new WasmLocal(WasmType.INT32, "coroutine$state");
-        function.add(fiberLocal);
-        function.add(stateLocal);
+        try {
+            currentFunction = function;
+            collector = new SuspensionPointCollector();
+            collector.visitMany(function.getBody());
+            var originalLocals = function.getLocalVariables().size();
+            fiberLocal = new WasmLocal(classInfoProvider.getClassInfo(FIBER).getType(), "coroutine$fiber");
+            stateLocal = new WasmLocal(WasmType.INT32, "coroutine$state");
+            function.add(fiberLocal);
+            function.add(stateLocal);
 
-        new BreakTargetCollector().visitMany(function.getBody());
-        var mainBlock = new WasmBlock(false);
-        mainBlock.getBody().transferFrom(function.getBody());
+            new BreakTargetCollector().visitMany(function.getBody());
+            var mainBlock = new WasmBlock(false);
+            mainBlock.getBody().transferFrom(function.getBody());
 
-        generatePrologue(originalLocals);
-        function.getBody().add(mainBlock);
-        splitList(mainBlock.getBody(), Collections.emptyList(), function.getType().getReturnTypes(),
-                mainBlock.getBody());
-        if (!mainBlock.getBody().getLast().isTerminating()) {
-            mainBlock.getBody().add(new WasmReturn());
+            generatePrologue(originalLocals);
+            function.getBody().add(mainBlock);
+            splitList(mainBlock.getBody(), Collections.emptyList(), function.getType().getReturnTypes(),
+                    mainBlock.getBody());
+            if (!mainBlock.getBody().getLast().isTerminating()) {
+                mainBlock.getBody().add(new WasmReturn());
+            }
+            generateEpilogue(originalLocals);
+        } finally {
+            currentFunction = null;
+            savedFunctionLocal = null;
+            collector = null;
+            currentStateOffset = 0;
+            stateLocal = null;
+            fiberLocal = null;
+            usedBreakTargets.clear();
         }
-        generateEpilogue(originalLocals);
-
-        currentFunction = null;
-        savedFunctionLocal = null;
-        collector = null;
-        currentStateOffset = 0;
-        stateLocal = null;
-        fiberLocal = null;
-        usedBreakTargets.clear();
     }
 
     private void generatePrologue(int localsCount) {
