@@ -80,6 +80,24 @@ public class CoroutineTransformation {
     }
 
     public void transform(WasmFunction function) {
+        // The instance is reused for every suspending method, so its per-function state has to be
+        // dropped even when the transformation fails: generateMethodBody catches the exception and
+        // stubs out that one body, and a savedFunctionLocal left pointing at the abandoned function
+        // then goes on being emitted into every method transformed after it.
+        try {
+            transformImpl(function);
+        } finally {
+            currentFunction = null;
+            savedFunctionLocal = null;
+            collector = null;
+            currentStateOffset = 0;
+            stateLocal = null;
+            fiberLocal = null;
+            usedBreakTargets.clear();
+        }
+    }
+
+    private void transformImpl(WasmFunction function) {
         currentFunction = function;
         collector = new SuspensionPointCollector();
         collector.visitMany(function.getBody());
@@ -101,14 +119,6 @@ public class CoroutineTransformation {
             mainBlock.getBody().add(new WasmReturn());
         }
         generateEpilogue(originalLocals);
-
-        currentFunction = null;
-        savedFunctionLocal = null;
-        collector = null;
-        currentStateOffset = 0;
-        stateLocal = null;
-        fiberLocal = null;
-        usedBreakTargets.clear();
     }
 
     private void generatePrologue(int localsCount) {
