@@ -23,6 +23,11 @@ public class WasmTypeInference implements WasmInstructionVisitor {
     public final List<WasmType> typeStack = new ArrayList<>();
     private int depthBeforeLastInstructionOut;
 
+    /**
+     * Depth of the type stack right before the last visited instruction pushed its results.
+     * Every instruction must maintain it, including those that push nothing, otherwise consumers
+     * read a value left over by some earlier instruction, which may exceed the current stack depth.
+     */
     public int getDepthBeforeLastInstructionOut() {
         return depthBeforeLastInstructionOut;
     }
@@ -30,6 +35,7 @@ public class WasmTypeInference implements WasmInstructionVisitor {
     @Override
     public void visit(WasmUnreachable instruction) {
         typeStack.clear();
+        depthBeforeLastInstructionOut = 0;
     }
 
     @Override
@@ -39,6 +45,8 @@ public class WasmTypeInference implements WasmInstructionVisitor {
             popN(type.getInputTypes().size());
             depthBeforeLastInstructionOut = typeStack.size();
             typeStack.addAll(type.getOutputTypes());
+        } else {
+            depthBeforeLastInstructionOut = typeStack.size();
         }
     }
 
@@ -50,12 +58,15 @@ public class WasmTypeInference implements WasmInstructionVisitor {
             popN(type.getInputTypes().size());
             depthBeforeLastInstructionOut = typeStack.size();
             typeStack.addAll(type.getOutputTypes());
+        } else {
+            depthBeforeLastInstructionOut = typeStack.size();
         }
     }
 
     @Override
     public void visit(WasmBranch instruction) {
         pop();
+        depthBeforeLastInstructionOut = typeStack.size();
     }
 
     @Override
@@ -70,6 +81,8 @@ public class WasmTypeInference implements WasmInstructionVisitor {
             if (ref.isNullable()) {
                 typeStack.set(typeStack.size() - 1, ref.asNonNull());
             }
+        } else {
+            depthBeforeLastInstructionOut = 0;
         }
     }
 
@@ -87,16 +100,19 @@ public class WasmTypeInference implements WasmInstructionVisitor {
     @Override
     public void visit(WasmBreak instruction) {
         typeStack.clear();
+        depthBeforeLastInstructionOut = 0;
     }
 
     @Override
     public void visit(WasmSwitch instruction) {
         typeStack.clear();
+        depthBeforeLastInstructionOut = 0;
     }
 
     @Override
     public void visit(WasmReturn instruction) {
         typeStack.clear();
+        depthBeforeLastInstructionOut = 0;
     }
 
     @Override
@@ -341,8 +357,8 @@ public class WasmTypeInference implements WasmInstructionVisitor {
 
     @Override
     public void visit(WasmThrow instruction) {
-        depthBeforeLastInstructionOut = typeStack.size();
         typeStack.clear();
+        depthBeforeLastInstructionOut = 0;
     }
 
     @Override
