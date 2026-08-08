@@ -49,6 +49,18 @@ public class CollectorsTest {
     }
 
     @Test
+    public void joiningEmptyElements() {
+        // An empty element must still be delimited. Whether anything has been
+        // joined yet cannot be inferred from the buffer being empty.
+        assertEquals(",b", Stream.of("", "b").collect(Collectors.joining(",")));
+        assertEquals(",,", Stream.of("", "", "").collect(Collectors.joining(",")));
+        assertEquals("a,,b", Stream.of("a", "", "b").collect(Collectors.joining(",")));
+        assertEquals("a,", Stream.of("a", "").collect(Collectors.joining(",")));
+        assertEquals("[,b]", Stream.of("", "b").collect(Collectors.joining(",", "[", "]")));
+        assertEquals("\nb", Stream.of("", "b").collect(Collectors.joining("\n")));
+    }
+
+    @Test
     public void toList() {
         assertEquals(Arrays.asList(1, 2, 3), Stream.of(1, 2, 3).collect(Collectors.toList()));
     }

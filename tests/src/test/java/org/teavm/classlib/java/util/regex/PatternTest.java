@@ -33,6 +33,7 @@
 
 package org.teavm.classlib.java.util.regex;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -1390,5 +1391,41 @@ public class PatternTest {
         assertThrows(IllegalArgumentException.class, () -> matcher.group("qwe"));
         assertThrows(IllegalArgumentException.class, () -> matcher.start("qwe"));
         assertThrows(IllegalArgumentException.class, () -> matcher.end("qwe"));
+    }
+
+    @Test
+    public void lineBreakMatcher() {
+        // \R matches CR LF as one unit, or any single line terminator.
+        assertArrayEquals(new String[] { "a", "b" }, Pattern.compile("\\R").split("a\r\nb"));
+        assertArrayEquals(new String[] { "a", "b" }, Pattern.compile("\\R").split("a\nb"));
+        assertArrayEquals(new String[] { "a", "b" }, Pattern.compile("\\R").split("a\rb"));
+        assertArrayEquals(new String[] { "a", "b" }, Pattern.compile("\\R").split("a\u2028b"));
+        assertArrayEquals(new String[] { "a", "", "b" }, Pattern.compile("\\R").split("a\n\nb"));
+
+        var matcher = Pattern.compile("\\R").matcher("a\r\nb");
+        assertTrue(matcher.find());
+        assertEquals(1, matcher.start());
+        assertEquals(3, matcher.end());
+        assertFalse(matcher.find());
+
+        assertTrue(Pattern.compile("a\\R+b").matcher("a\r\n\nb").matches());
+        assertFalse(Pattern.compile("\\R").matcher("a").find());
+        // Group numbering is unaffected by how \R is implemented.
+        var groups = Pattern.compile("(a)\\R(b)").matcher("a\nb");
+        assertTrue(groups.matches());
+        assertEquals("a", groups.group(1));
+        assertEquals("b", groups.group(2));
+    }
+
+    @Test
+    public void alphabeticProperty() {
+        assertTrue(Pattern.compile("\\p{IsAlphabetic}").matcher("a").matches());
+        assertTrue(Pattern.compile("\\p{IsAlphabetic}").matcher("\u00e9").matches());
+        assertFalse(Pattern.compile("\\p{IsAlphabetic}").matcher("1").matches());
+        assertFalse(Pattern.compile("\\p{IsAlphabetic}").matcher(" ").matches());
+        // \P{IsAlphabetic} is deliberately not asserted: negation is broken for
+        // every char class built as an anonymous AbstractCharClass overriding
+        // contains(int), which \P{javaJavaIdentifierStart} shows too. That is a
+        // separate, pre-existing bug.
     }
 }

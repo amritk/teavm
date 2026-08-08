@@ -185,6 +185,12 @@ public final class TSystem extends TObject {
             defaults.put("java.io.tmpdir", getTempDir());
             defaults.put("java.vm.version", "21");
             defaults.put("user.home", getHomeDir());
+            defaults.put("user.dir", getHomeDir());
+            // There is no JDK installation to point at, but java.home and
+            // user.dir are properties the platform is required to define, and
+            // code that reads them tends to hand the result straight to
+            // Paths.get, which throws on null.
+            defaults.put("java.home", "/");
             properties = new Properties(defaults);
         }
     }
