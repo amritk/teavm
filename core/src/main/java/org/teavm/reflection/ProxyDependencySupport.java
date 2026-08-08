@@ -143,6 +143,14 @@ class ProxyDependencySupport {
             if (method.hasModifier(ElementModifier.BRIDGE)) {
                 continue;
             }
+            // A proxy implements instance methods. Static ones are not dispatched
+            // through the invocation handler, and <clinit> - which an interface
+            // gets as soon as it declares a constant - is not a member at all, so
+            // the getDeclaredMethod the generated initializer emits for it can
+            // only throw NoSuchMethodException.
+            if (method.hasModifier(ElementModifier.STATIC)) {
+                continue;
+            }
             var signature = new Signature(method.getName(), method.getDescriptor().getParameterTypes());
             if (generatedMethods.add(signature)) {
                 generateWorkerMethod(method, cls, methodIdHolder.id++);

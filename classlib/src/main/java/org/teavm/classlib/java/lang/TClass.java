@@ -252,7 +252,7 @@ public final class TClass<T> extends TObject implements TGenericDeclaration, TTy
                 return field;
             }
         }
-        throw new TNoSuchFieldException();
+        throw new TNoSuchFieldException(getName() + "." + name);
     }
 
     public TField getField(String name) throws TNoSuchFieldException {
@@ -413,7 +413,11 @@ public final class TClass<T> extends TObject implements TGenericDeclaration, TTy
             }
         }
         if (bestFit == null) {
-            throw new TNoSuchMethodException();
+            // Named, because reflection here fails at build-time configuration
+            // rather than at the call: the method is missing from the metadata,
+            // not from the class. An unnamed NoSuchMethodException out of a
+            // generated proxy's initializer says nothing about which one.
+            throw new TNoSuchMethodException(getName() + "." + name);
         }
         return bestFit;
     }
