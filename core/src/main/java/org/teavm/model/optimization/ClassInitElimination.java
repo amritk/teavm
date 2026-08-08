@@ -57,7 +57,18 @@ public class ClassInitElimination implements MethodOptimization {
                 }
                 if (insn instanceof InvokeInstruction) {
                     InvokeInstruction invoke = (InvokeInstruction) insn;
-                    step.initializedClasses.add(invoke.getMethod().getClassName());
+                    // Only a static call initializes the class it names:
+                    // ClassInitializerInsertionTransformer puts the initializer
+                    // call at the top of static methods and constructors, not
+                    // instance methods, and an interface call initializes the
+                    // receiver's class rather than the interface. Counting
+                    // instance calls here deleted the initializer that a later
+                    // read of the same class's static field depended on.
+                    // ClassInitInsertion, which puts these instructions in, uses
+                    // exactly this condition.
+                    if (invoke.getInstance() == null) {
+                        step.initializedClasses.add(invoke.getMethod().getClassName());
+                    }
                 }
             }
 
