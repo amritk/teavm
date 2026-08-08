@@ -287,4 +287,18 @@ public class StringBuilderTest {
                 new char[] { (char) 56972, (char) 56178 }).codePoints().toArray());
         assertArrayEquals(new int[] { 56178 }, new StringBuilder().append((char) 56178).codePoints().toArray());
     }
+
+    @Test
+    public void repeatCodePoint() {
+        assertEquals("aaa", new StringBuilder().repeat('a', 3).toString());
+        assertEquals("x", new StringBuilder("x").repeat('y', 0).toString());
+        // A supplementary code point takes two chars per repetition.
+        assertEquals(4, new StringBuilder().repeat(969356, 2).length());
+        try {
+            new StringBuilder().repeat('a', -1);
+            fail("expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            // expected
+        }
+    }
 }
