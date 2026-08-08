@@ -144,9 +144,13 @@ public abstract class TCharset implements Comparable<TCharset> {
         static {
             TCharset[] charsets = { TStandardCharsets.UTF_8, TStandardCharsets.US_ASCII,
                     TStandardCharsets.ISO_8859_1, TStandardCharsets.UTF_16, TStandardCharsets.UTF_16BE,
-                    TStandardCharsets.UTF_16LE };
+                    TStandardCharsets.UTF_16LE, TStandardCharsets.UTF_32BE, TStandardCharsets.UTF_32LE,
+                    TStandardCharsets.WINDOWS_1251 };
             for (TCharset charset : charsets) {
-                value.put(charset.name(), charset);
+                // Uppercased, because forName looks up by the uppercased name.
+                // Every canonical name here used to be uppercase already, so the
+                // two agreed by accident; windows-1251 is the first that is not.
+                value.put(charset.name().toUpperCase(), charset);
             }
         }
     }
