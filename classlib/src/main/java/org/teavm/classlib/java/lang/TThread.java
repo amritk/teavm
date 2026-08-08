@@ -24,6 +24,20 @@ import org.teavm.runtime.EventQueue;
 import org.teavm.runtime.Fiber;
 
 public class TThread extends TObject implements TRunnable {
+    /** One thread, always running; the other states exist so switches compile. */
+    public enum State {
+        NEW,
+        RUNNABLE,
+        BLOCKED,
+        WAITING,
+        TIMED_WAITING,
+        TERMINATED
+    }
+
+    public State getState() {
+        return State.RUNNABLE;
+    }
+
     private static TThread mainThread = new TThread("main");
     private static TThread currentThread = mainThread;
     private static int nextId = 1;
@@ -275,6 +289,10 @@ public class TThread extends TObject implements TRunnable {
 
     public TStackTraceElement[] getStackTrace() {
         return new TStackTraceElement[0];
+    }
+
+    public void setContextClassLoader(TClassLoader classLoader) {
+        // One class loader, fixed at build time; nothing to switch to.
     }
 
     public TClassLoader getContextClassLoader() {

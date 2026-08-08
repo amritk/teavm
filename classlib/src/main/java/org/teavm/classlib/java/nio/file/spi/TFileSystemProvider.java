@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import org.teavm.classlib.java.net.TURI;
 import org.teavm.classlib.java.nio.file.TAccessMode;
 import org.teavm.classlib.java.nio.file.TCopyOption;
@@ -40,6 +41,15 @@ public abstract class TFileSystemProvider {
     private static List<TFileSystemProvider> installedProviders;
 
     protected TFileSystemProvider() {
+    }
+
+    /**
+     * Non-abstract on the JDK too: a provider that cannot open a channel says so
+     * rather than forcing every provider to implement one.
+     */
+    public java.nio.channels.FileChannel newFileChannel(TPath path, Set<? extends org.teavm.classlib.java.nio.file.TOpenOption> options,
+            org.teavm.classlib.java.nio.file.attribute.TFileAttribute<?>... attrs) throws IOException {
+        throw new UnsupportedOperationException();
     }
 
     public abstract String getScheme();
@@ -64,7 +74,7 @@ public abstract class TFileSystemProvider {
     public abstract TDirectoryStream<TPath> newDirectoryStream(TPath dir,
             TDirectoryStream.Filter<? super TPath> filter) throws IOException;
 
-    public abstract void createDirectory(TPath dir, TFileAttribute<?>... attrs) throws IOException;
+    public abstract void createDirectory(TPath dir, org.teavm.classlib.java.nio.file.attribute.TFileAttribute<?>... attrs) throws IOException;
 
     public abstract void delete(TPath path) throws IOException;
 

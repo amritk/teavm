@@ -636,6 +636,77 @@ public class TConcurrentHashMap<K, V> extends TAbstractMap<K, V>
         return elementCount == 0;
     }
 
+    /**
+     * A set backed by a map, which is how the JDK gives you a concurrent set
+     * without a separate implementation. Only the members reached from here are
+     * provided; the rest come from AbstractSet.
+     */
+    public static class KeySetView<K, V> extends TAbstractSet<K> {
+        private final TConcurrentHashMap<K, V> map;
+        private final V value;
+
+        KeySetView(TConcurrentHashMap<K, V> map, V value) {
+            this.map = map;
+            this.value = value;
+        }
+
+        public TConcurrentHashMap<K, V> getMap() {
+            return map;
+        }
+
+        public V getMappedValue() {
+            return value;
+        }
+
+        @Override
+        public boolean add(K key) {
+            if (value == null) {
+                throw new UnsupportedOperationException("no mapped value");
+            }
+            return map.put(key, value) == null;
+        }
+
+        @Override
+        public boolean remove(Object o) {
+            return map.remove(o) != null;
+        }
+
+        @Override
+        public boolean contains(Object o) {
+            return map.containsKey(o);
+        }
+
+        @Override
+        public void clear() {
+            map.clear();
+        }
+
+        @Override
+        public int size() {
+            return map.size();
+        }
+
+        @Override
+        public org.teavm.classlib.java.util.TIterator<K> iterator() {
+            return map.keySet().iterator();
+        }
+    }
+
+    public static <K> KeySetView<K, Boolean> newKeySet() {
+        return new KeySetView<>(new TConcurrentHashMap<>(), Boolean.TRUE);
+    }
+
+    public static <K> KeySetView<K, Boolean> newKeySet(int initialCapacity) {
+        return new KeySetView<>(new TConcurrentHashMap<>(initialCapacity), Boolean.TRUE);
+    }
+
+    public KeySetView<K, V> keySet(V mappedValue) {
+        if (mappedValue == null) {
+            throw new NullPointerException();
+        }
+        return new KeySetView<>(this, mappedValue);
+    }
+
     @Override
     public TSet<K> keySet() {
         if (cachedKeySet == null) {
