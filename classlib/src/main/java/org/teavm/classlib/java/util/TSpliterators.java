@@ -17,6 +17,7 @@ package org.teavm.classlib.java.util;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
@@ -333,5 +334,63 @@ public class TSpliterators {
                 return characteristics;
             }
         };
+    }
+
+    public static <T> Iterator<T> iterator(TSpliterator<? extends T> spliterator) {
+        return new Iterator<T>() {
+            private boolean valueReady;
+            private T value;
+
+            @Override
+            public boolean hasNext() {
+                if (!valueReady) {
+                    valueReady = spliterator.tryAdvance(e -> value = e);
+                }
+                return valueReady;
+            }
+
+            @Override
+            public T next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                T result = value;
+                value = null;
+                valueReady = false;
+                return result;
+            }
+        };
+    }
+
+    /**
+     * Splitting is optional: {@code trySplit} returning null means "cannot be
+     * split", which is the correct answer here, since TeaVM has no parallel
+     * streams to split for.
+     */
+    public abstract static class AbstractSpliterator<T> implements TSpliterator<T> {
+        private final int characteristics;
+        private long estimate;
+
+        protected AbstractSpliterator(long estimate, int additionalCharacteristics) {
+            this.estimate = estimate;
+            this.characteristics = (additionalCharacteristics & TSpliterator.SIZED) != 0
+                    ? additionalCharacteristics | TSpliterator.SUBSIZED
+                    : additionalCharacteristics;
+        }
+
+        @Override
+        public TSpliterator<T> trySplit() {
+            return null;
+        }
+
+        @Override
+        public long estimateSize() {
+            return estimate;
+        }
+
+        @Override
+        public int characteristics() {
+            return characteristics;
+        }
     }
 }

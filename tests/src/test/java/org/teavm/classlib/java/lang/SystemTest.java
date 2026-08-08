@@ -206,4 +206,14 @@ public class SystemTest {
         assertNotNull(System.getProperty("user.home"));
         assertNotNull(System.getProperty("java.io.tmpdir"));
     }
+
+    @Test
+    public void exitIsRejected() {
+        try {
+            System.exit(0);
+            fail("expected UnsupportedOperationException");
+        } catch (UnsupportedOperationException e) {
+            // expected
+        }
+    }
 }

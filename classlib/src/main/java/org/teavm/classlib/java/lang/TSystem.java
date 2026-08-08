@@ -312,6 +312,10 @@ public final class TSystem extends TObject {
         return null;
     }
 
+    public static void exit(int status) {
+        throw new TUnsupportedOperationException("System.exit is not supported");
+    }
+
     public static Logger getLogger(String name) {
         return ConsoleLogger.INSTANCE;
     }
