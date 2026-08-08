@@ -41,7 +41,9 @@ public final class TManagementFactory {
         return List.of();
     }
 
-    public static Object getRuntimeMXBean() {
-        throw new UnsupportedOperationException("java.lang.management is not supported");
+    public static TRuntimeMXBean getRuntimeMXBean() {
+        return RUNTIME_BEAN;
     }
+
+    private static final TRuntimeMXBean RUNTIME_BEAN = new TRuntimeMXBean();
 }

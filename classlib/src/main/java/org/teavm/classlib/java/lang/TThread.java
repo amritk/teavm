@@ -163,14 +163,12 @@ public class TThread extends TObject implements TRunnable {
     }
 
     public static void yield() {
-        TThread currentThread = currentThread();
-        if (++currentThread.yieldCount < 30) {
-            return;
-        }
+        // Single-threaded build: there is no other thread to yield to, so this
+        // is a no-op rather than a context switch. Calling switchContext here
+        // would be @Async, and async-ness propagates to every caller through a
+        // call graph that includes exception construction and virtual toString,
+        // which reaches practically the whole program - see patches/README.md.
         currentThread().yieldCount = 0;
-        if (currentThread.timeSliceStart + 100 < System.currentTimeMillis()) {
-            switchContext(currentThread);
-        }
     }
 
     @Async
@@ -225,8 +223,13 @@ public class TThread extends TObject implements TRunnable {
         return TObject.holdsLock(obj);
     }
 
-    @Async
-    public static native void sleep(long millis) throws TInterruptedException;
+    // Single-threaded build: nothing else can run while this thread waits, so
+    // there is nothing to wait for and the event queue that would wake it never
+    // gets a turn. Returning immediately is what a sleep in a program with no
+    // other work amounts to. Not @Async - see patches/README.md for why one
+    // reachable @Async method makes a third of the program a coroutine.
+    public static void sleep(long millis) throws TInterruptedException {
+    }
 
     private static void sleep(long millis, AsyncCallback<Void> callback) {
         TThread current = currentThread();
