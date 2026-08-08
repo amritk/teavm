@@ -1428,7 +1428,7 @@ public class WasmGCClassGenerator implements WasmGCClassInfoProvider, WasmGCInit
         var global = new WasmGlobal(wasmName, type);
         var initBuilder = global.getInitialValue().builder();
         if (initValue != null) {
-            staticInitialValue(initBuilder, initValue);
+            staticInitialValue(initBuilder, initValue, type);
         } else {
             defaultValueOfType(initBuilder, type);
         }
@@ -1438,7 +1438,7 @@ public class WasmGCClassGenerator implements WasmGCClassInfoProvider, WasmGCInit
         return global;
     }
 
-    private void staticInitialValue(WasmInstructionBuilder builder, Object value) {
+    private void staticInitialValue(WasmInstructionBuilder builder, Object value, WasmType type) {
         if (value instanceof Boolean) {
             builder.i32Const((Boolean) value ? 1 : 0);
         } else if (value instanceof Byte) {
@@ -1456,7 +1456,10 @@ public class WasmGCClassGenerator implements WasmGCClassInfoProvider, WasmGCInit
         } else if (value instanceof Double) {
             builder.f64Const((Double) value);
         } else {
-            builder.nullConst(standardClasses.stringClass().getType());
+            // The remaining case is a String constant, filled in later by
+            // dynamicInitialValue. Emit the default for the global's own type
+            // rather than a string-typed null, which need not match it.
+            defaultValueOfType(builder, type);
         }
     }
 
