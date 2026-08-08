@@ -196,4 +196,14 @@ public class SystemTest {
         int hc1 = System.identityHashCode(o);
         assertEquals(hc, hc1);
     }
+
+    @Test
+    public void requiredPropertiesAreDefined() {
+        // Code that reads these tends to hand the result straight to Paths.get,
+        // which throws on null.
+        assertNotNull(System.getProperty("java.home"));
+        assertNotNull(System.getProperty("user.dir"));
+        assertNotNull(System.getProperty("user.home"));
+        assertNotNull(System.getProperty("java.io.tmpdir"));
+    }
 }

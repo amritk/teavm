@@ -216,6 +216,10 @@ class TLexer {
     // original string representing pattern
     private String orig;
 
+    // The specification's own definition of \R, as a non-capturing group so
+    // that expanding it does not disturb group numbering.
+    private static final String LINE_BREAK = "(?:\\r\\n|[\\n\\x0B\\f\\r\\x85\\u2028\\u2029])";
+
     public TLexer(String pattern, int flags) {
         orig = pattern;
         if ((flags & TPattern.LITERAL) > 0) {
@@ -223,6 +227,7 @@ class TLexer {
         } else if ((flags & TPattern.CANON_EQ) > 0) {
             pattern = TLexer.normalize(pattern);
         }
+        pattern = expandLineBreaks(pattern);
 
         this.pattern = new char[pattern.length() + 2];
         System.arraycopy(pattern.toCharArray(), 0, this.pattern, 0, pattern.length());
@@ -234,6 +239,54 @@ class TLexer {
         movePointer();
         movePointer();
 
+    }
+
+    /**
+     * Rewrites every {@code \R} outside a character class into the alternation
+     * the specification defines it as, so the rest of the engine never sees the
+     * construct. Expanding here rather than adding a node keeps quantifiers and
+     * backtracking correct: {@code \R} is the only token that can consume two
+     * characters, and every set the engine builds assumes a fixed width.
+     *
+     * {@code orig} keeps the pattern as written, so {@code Pattern.pattern()}
+     * still reports it. Inside a character class {@code \R} is left alone and
+     * still rejected, which is what a JVM does with it too.
+     */
+    private static String expandLineBreaks(String pattern) {
+        if (pattern.indexOf("\\R") < 0) {
+            return pattern;
+        }
+
+        var result = new StringBuilder(pattern.length() + LINE_BREAK.length());
+        var quoted = false;
+        var classDepth = 0;
+        for (var i = 0; i < pattern.length(); ++i) {
+            char c = pattern.charAt(i);
+            if (c == '\\' && i + 1 < pattern.length()) {
+                char escaped = pattern.charAt(i + 1);
+                if (quoted) {
+                    quoted = escaped != 'E';
+                } else if (escaped == 'Q') {
+                    quoted = true;
+                } else if (escaped == 'R' && classDepth == 0) {
+                    result.append(LINE_BREAK);
+                    ++i;
+                    continue;
+                }
+                result.append(c).append(escaped);
+                ++i;
+                continue;
+            }
+            if (!quoted) {
+                if (c == '[') {
+                    ++classDepth;
+                } else if (c == ']' && classDepth > 0) {
+                    --classDepth;
+                }
+            }
+            result.append(c);
+        }
+        return result.toString();
     }
 
     /**

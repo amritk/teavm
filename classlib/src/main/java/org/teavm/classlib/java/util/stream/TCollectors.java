@@ -78,20 +78,46 @@ public final class TCollectors {
 
     public static TCollector<CharSequence, ?, String> joining(CharSequence delimiter, CharSequence prefix,
             CharSequence suffix) {
-        BiConsumer<StringBuilder, CharSequence> accumulator = (sb, item) -> {
-            if (sb.length() > 0) {
+        BiConsumer<Joiner, CharSequence> accumulator = Joiner::add;
+        BinaryOperator<Joiner> combiner = Joiner::merge;
+        return TCollector.of(() -> new Joiner(delimiter), accumulator, combiner,
+                joiner -> prefix.toString() + joiner + suffix);
+    }
+
+    /**
+     * Whether anything has been joined yet cannot be read off the buffer's
+     * length: an empty first element leaves it empty, so the next element would
+     * arrive without a delimiter and the empty one would vanish. Splitting text
+     * on newlines and joining it back together is enough to hit that.
+     */
+    private static final class Joiner {
+        private final CharSequence delimiter;
+        private final StringBuilder sb = new StringBuilder();
+        private boolean empty = true;
+
+        Joiner(CharSequence delimiter) {
+            this.delimiter = delimiter;
+        }
+
+        void add(CharSequence item) {
+            if (!empty) {
                 sb.append(delimiter);
             }
+            empty = false;
             sb.append(item);
-        };
-        BinaryOperator<StringBuilder> combiner = (a, b) -> {
-            if (a.length() > 0) {
-                a.append(delimiter);
+        }
+
+        Joiner merge(Joiner other) {
+            if (!other.empty) {
+                add(other.sb);
             }
-            return a.append(b);
-        };
-        return TCollector.of(StringBuilder::new, accumulator, combiner,
-                sb -> sb.insert(0, prefix).append(suffix).toString());
+            return this;
+        }
+
+        @Override
+        public String toString() {
+            return sb.toString();
+        }
     }
 
     public static <T, A, R, K> TCollector<T, ?, K> mapping(Function<? super T, ? extends A> mapper,
