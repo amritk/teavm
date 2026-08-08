@@ -179,6 +179,12 @@ public final class TSystem extends TObject {
             Properties defaults = new Properties();
             defaults.put("java.version", "21");
             defaults.put("os.name", "TeaVM");
+            // os.version and os.arch are defined for the same reason java.home
+            // is: every JVM defines them, so code reads them without a null
+            // check. IntelliJ's SystemInfoRt calls toLowerCase on os.version
+            // straight out of a static initializer.
+            defaults.put("os.version", "0");
+            defaults.put("os.arch", "wasm32");
             defaults.put("file.separator", VirtualFileSystemProvider.getInstance().isWindows() ? "\\" : "/");
             defaults.put("path.separator", VirtualFileSystemProvider.getInstance().isWindows() ? ";" : ":");
             defaults.put("line.separator", lineSeparator());
