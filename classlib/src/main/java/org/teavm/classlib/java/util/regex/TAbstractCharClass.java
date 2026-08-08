@@ -566,6 +566,21 @@ abstract class TAbstractCharClass extends TSpecialToken {
         }
     }
 
+    static class LazyAlphabetic extends LazyCharClass {
+        @Override
+        protected TAbstractCharClass computeValue() {
+            TAbstractCharClass chCl = new TAbstractCharClass() {
+                @Override
+                public boolean contains(int ch) {
+                    return Character.isAlphabetic(ch);
+                }
+            };
+
+            chCl.mayContainSupplCodepoints = true;
+            return chCl;
+        }
+    }
+
     static class LazyJavaLetter extends LazyCharClass {
         @Override
         protected TAbstractCharClass computeValue() {
@@ -680,6 +695,10 @@ abstract class TAbstractCharClass extends TSpecialToken {
                 { "javaDigit", new LazyJavaDigit() }, //$NON-NLS-1$
                 { "javaIdentifierIgnorable", new LazyJavaIdentifierIgnorable() }, //$NON-NLS-1$
                 { "javaISOControl", new LazyJavaISOControl() }, //$NON-NLS-1$
+                // \p{IsAlphabetic}: the "Is" prefix is stripped before the
+                // lookup, so this is the binary Unicode property under the name
+                // Character answers it by.
+                { "Alphabetic", new LazyAlphabetic() }, //$NON-NLS-1$
                 { "javaJavaIdentifierPart", new LazyJavaJavaIdentifierPart() }, //$NON-NLS-1$
                 { "javaJavaIdentifierStart", new LazyJavaJavaIdentifierStart() }, //$NON-NLS-1$
                 { "javaLetter", new LazyJavaLetter() }, //$NON-NLS-1$
