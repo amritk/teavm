@@ -56,6 +56,45 @@ public abstract class TResourceBundle {
     public TResourceBundle() {
     }
 
+    /**
+     * Bundles are baked in at build time and never reloaded, so there is no
+     * cache to clear and no loading strategy to override. Control exists so
+     * that code holding a reference to it links.
+     */
+    public static class Control {
+        public static final java.util.List<String> FORMAT_DEFAULT = java.util.List.of("java.class",
+                "java.properties");
+        public static final java.util.List<String> FORMAT_CLASS = java.util.List.of("java.class");
+        public static final java.util.List<String> FORMAT_PROPERTIES = java.util.List.of("java.properties");
+        public static final long TTL_DONT_CACHE = -1;
+        public static final long TTL_NO_EXPIRATION_CONTROL = -2;
+
+        protected Control() {
+        }
+
+        public static Control getControl(java.util.List<String> formats) {
+            return new Control();
+        }
+
+        public static Control getNoFallbackControl(java.util.List<String> formats) {
+            return new Control();
+        }
+
+        public java.util.List<String> getFormats(String baseName) {
+            return FORMAT_DEFAULT;
+        }
+
+        public long getTimeToLive(String baseName, Locale locale) {
+            return TTL_NO_EXPIRATION_CONTROL;
+        }
+    }
+
+    public static void clearCache() {
+    }
+
+    public static void clearCache(ClassLoader loader) {
+    }
+
     public static TResourceBundle getBundle(String bundleName)
             throws MissingResourceException {
         return getBundleImpl(bundleName, Locale.getDefault(), ClassLoader.getSystemClassLoader());
@@ -63,6 +102,12 @@ public abstract class TResourceBundle {
 
     public static TResourceBundle getBundle(String bundleName, Locale locale) {
         return getBundleImpl(bundleName, locale, ClassLoader.getSystemClassLoader());
+    }
+
+    /** The Control is ignored: there is one loading strategy and it is baked in. */
+    public static TResourceBundle getBundle(String bundleName, Locale locale, ClassLoader loader,
+            Control control) {
+        return getBundle(bundleName, locale, loader);
     }
 
     public static TResourceBundle getBundle(String bundleName, Locale locale, ClassLoader loader)

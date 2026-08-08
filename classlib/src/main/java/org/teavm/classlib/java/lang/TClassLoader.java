@@ -61,6 +61,24 @@ public abstract class TClassLoader extends TObject {
         return new ByteArrayInputStream(Base64Impl.decode(bytes));
     }
 
+    /** See TClass.getResource: there is no location to hand back. */
+    public java.net.URL getResource(String name) {
+        return null;
+    }
+
+    public static java.net.URL getSystemResource(String name) {
+        return null;
+    }
+
+    /**
+     * The world is closed at build time, so a name that was not linked in cannot
+     * be produced at run time. Reporting that is better than returning null and
+     * letting the caller fail somewhere less obvious.
+     */
+    public TClass<?> loadClass(String name) throws TClassNotFoundException {
+        throw new TClassNotFoundException(name);
+    }
+
     public static InputStream getSystemResourceAsStream(String name) {
         return getSystemClassLoader().getResourceAsStream(name);
     }

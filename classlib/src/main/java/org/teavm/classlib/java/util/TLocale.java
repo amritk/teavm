@@ -144,6 +144,31 @@ public final class TLocale implements TCloneable, TSerializable {
         return countryCode;
     }
 
+    /**
+     * Enough of BCP 47 for the tags that actually appear: language, script and
+     * region. Extensions are dropped rather than misparsed.
+     */
+    public static TLocale forLanguageTag(String languageTag) {
+        if (languageTag == null || languageTag.isEmpty() || languageTag.equals("und")) {
+            return new TLocale("", "", "");
+        }
+        String[] parts = languageTag.replace('_', '-').split("-");
+        String language = parts.length > 0 ? parts[0].toLowerCase() : "";
+        String country = "";
+        String variant = "";
+        for (int i = 1; i < parts.length; ++i) {
+            String part = parts[i];
+            if (part.length() == 2 || (part.length() == 3 && Character.isDigit(part.charAt(0)))) {
+                country = part.toUpperCase();
+                if (i + 1 < parts.length) {
+                    variant = parts[i + 1];
+                }
+                break;
+            }
+        }
+        return new TLocale(language, country, variant);
+    }
+
     public static TLocale getDefault() {
         return defaultLocale;
     }

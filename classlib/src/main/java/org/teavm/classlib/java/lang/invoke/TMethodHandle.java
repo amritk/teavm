@@ -15,5 +15,59 @@
  */
 package org.teavm.classlib.java.lang.invoke;
 
+import org.teavm.classlib.java.lang.TClass;
+
 public abstract class TMethodHandle {
+    // MethodHandle.invoke and invokeExact are polymorphic-signature methods: the
+    // caller writes whatever descriptor it likes and the JVM resolves it at run
+    // time. An ahead-of-time compiler has to see a matching declaration, so the
+    // descriptors this program emits are spelled out. That is whack-a-mole, and
+    // the real fix is for the compiler to treat these two names specially.
+    public Object invoke() {
+        throw unsupported();
+    }
+
+    public void invoke(Object arg) {
+        throw unsupported();
+    }
+
+    public void invoke(java.util.ResourceBundle arg) {
+        throw unsupported();
+    }
+
+    public void invokeExact(Object[] args) {
+        throw unsupported();
+    }
+
+    public Object invoke(Object... args) {
+        throw unsupported();
+    }
+
+    public Object invokeWithArguments(Object... args) {
+        throw unsupported();
+    }
+
+    public Object invokeWithArguments(java.util.List<?> args) {
+        throw unsupported();
+    }
+
+    public TMethodHandle bindTo(Object receiver) {
+        throw unsupported();
+    }
+
+    public TMethodHandle asType(TMethodType newType) {
+        throw unsupported();
+    }
+
+    public TMethodHandle asSpreader(TClass<?> arrayType, int arrayLength) {
+        throw unsupported();
+    }
+
+    public TMethodType type() {
+        throw unsupported();
+    }
+
+    private static RuntimeException unsupported() {
+        return new UnsupportedOperationException("MethodHandles cannot be resolved ahead of time");
+    }
 }

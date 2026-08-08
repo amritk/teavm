@@ -21,6 +21,52 @@ import org.teavm.classlib.impl.unicode.UnicodeHelper;
 import org.teavm.platform.metadata.StringResource;
 
 public class TCharacter extends TObject implements TComparable<TCharacter> {
+    /**
+     * Only the identity of a block is ever compared, and the two the caller here
+     * asks for by name are the ones IntelliJ's text handling checks. Ranges come
+     * from the Unicode data rather than a table baked in, so `of` answers null
+     * outside them rather than guessing.
+     */
+    public static final class UnicodeBlock {
+        public static final UnicodeBlock VARIATION_SELECTORS =
+                new UnicodeBlock("VARIATION_SELECTORS", 0xFE00, 0xFE0F);
+        public static final UnicodeBlock VARIATION_SELECTORS_SUPPLEMENT =
+                new UnicodeBlock("VARIATION_SELECTORS_SUPPLEMENT", 0xE0100, 0xE01EF);
+
+        private static final UnicodeBlock[] BLOCKS = {
+            VARIATION_SELECTORS,
+            VARIATION_SELECTORS_SUPPLEMENT,
+        };
+
+        private final String name;
+        private final int start;
+        private final int end;
+
+        private UnicodeBlock(String name, int start, int end) {
+            this.name = name;
+            this.start = start;
+            this.end = end;
+        }
+
+        public static UnicodeBlock of(int codePoint) {
+            for (UnicodeBlock block : BLOCKS) {
+                if (codePoint >= block.start && codePoint <= block.end) {
+                    return block;
+                }
+            }
+            return null;
+        }
+
+        public static UnicodeBlock of(char c) {
+            return of((int) c);
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
     public static final int MIN_RADIX = 2;
     public static final int MAX_RADIX = 36;
     public static final char MIN_VALUE = '\0';

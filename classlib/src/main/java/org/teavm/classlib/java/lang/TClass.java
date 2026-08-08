@@ -703,6 +703,16 @@ public final class TClass<T> extends TObject implements TGenericDeclaration, TTy
         }
     }
 
+    /**
+     * Resources are baked into the module rather than living at a location, so
+     * there is no URL to name one by. Code that only tests for presence gets a
+     * truthful null; code that would open the stream should call
+     * getResourceAsStream, which does work.
+     */
+    public java.net.URL getResource(String name) {
+        return null;
+    }
+
     public InputStream getResourceAsStream(String name) {
         if (name.startsWith("/")) {
             return getClassLoader().getResourceAsStream(name.substring(1));
