@@ -408,4 +408,19 @@ public class StringTest {
         assertEquals("", " ".stripIndent());
         assertEquals("\n", " \n ".stripIndent());
     }
+
+    @Test
+    public void lines() {
+        assertArrayEquals(new String[] { "a", "b" }, "a\nb".lines().toArray(String[]::new));
+        assertArrayEquals(new String[] { "a", "b" }, "a\r\nb".lines().toArray(String[]::new));
+        assertArrayEquals(new String[] { "a", "b" }, "a\rb".lines().toArray(String[]::new));
+        // A terminator ends the last line rather than starting an empty one.
+        assertArrayEquals(new String[] { "a", "b" }, "a\nb\n".lines().toArray(String[]::new));
+        // Empty lines are lines, including a leading one.
+        assertArrayEquals(new String[] { "", "b" }, "\nb".lines().toArray(String[]::new));
+        assertArrayEquals(new String[] { "a", "", "b" }, "a\n\nb".lines().toArray(String[]::new));
+        assertArrayEquals(new String[0], "".lines().toArray(String[]::new));
+        assertArrayEquals(new String[] { "" }, "\n".lines().toArray(String[]::new));
+        assertArrayEquals(new String[] { "a" }, "a".lines().toArray(String[]::new));
+    }
 }

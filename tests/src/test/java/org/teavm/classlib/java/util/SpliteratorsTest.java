@@ -19,9 +19,11 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.Consumer;
@@ -116,5 +118,58 @@ public class SpliteratorsTest {
 
         assertArrayEquals(new Object[] { 1, 2, 9, 4 }, collected.toArray());
         assertEquals(0, spliterator.estimateSize());
+    }
+
+    @Test
+    public void iteratorOverSpliterator() {
+        var iterator = Spliterators.iterator(Spliterators.spliterator(new Object[] { 1, 2, 3 }, 0));
+
+        var collected = new ArrayList<>();
+        while (iterator.hasNext()) {
+            collected.add(iterator.next());
+        }
+
+        assertArrayEquals(new Object[] { 1, 2, 3 }, collected.toArray());
+        assertFalse(iterator.hasNext());
+    }
+
+    @Test
+    public void iteratorOverEmptySpliterator() {
+        var iterator = Spliterators.iterator(Spliterators.spliterator(new Object[0], 0));
+
+        assertFalse(iterator.hasNext());
+        try {
+            iterator.next();
+            fail("expected NoSuchElementException");
+        } catch (NoSuchElementException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void abstractSpliterator() {
+        var spliterator = new Spliterators.AbstractSpliterator<Integer>(3, Spliterator.SIZED) {
+            private int next = 1;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super Integer> action) {
+                if (next > 3) {
+                    return false;
+                }
+                action.accept(next++);
+                return true;
+            }
+        };
+
+        assertEquals(3L, spliterator.estimateSize());
+        // SIZED implies SUBSIZED. trySplit is left unasserted on purpose: the
+        // contract permits null, so pinning an answer would test an
+        // implementation rather than the contract.
+        assertTrue(spliterator.hasCharacteristics(Spliterator.SIZED));
+        assertTrue(spliterator.hasCharacteristics(Spliterator.SUBSIZED));
+
+        var collected = new ArrayList<Integer>();
+        spliterator.forEachRemaining(collected::add);
+        assertArrayEquals(new Object[] { 1, 2, 3 }, collected.toArray());
     }
 }

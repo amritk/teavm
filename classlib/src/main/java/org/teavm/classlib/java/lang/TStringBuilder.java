@@ -216,4 +216,14 @@ public class TStringBuilder extends TAbstractStringBuilder implements TAppendabl
         super.reverse();
         return this;
     }
+
+    public TStringBuilder repeat(int codePoint, int count) {
+        if (count < 0) {
+            throw new TIllegalArgumentException("count is negative: " + count);
+        }
+        for (int i = 0; i < count; ++i) {
+            appendCodePoint(codePoint);
+        }
+        return this;
+    }
 }

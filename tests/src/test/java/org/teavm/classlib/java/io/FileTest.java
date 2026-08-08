@@ -1901,6 +1901,12 @@ public class FileTest {
         assertTrue(exist);
     }
 
+    @Test
+    public void toPath() {
+        assertEquals("/tmp/a.txt", new File("/tmp/a.txt").toPath().toString());
+        assertEquals(new File("/tmp/a.txt"), new File("/tmp/a.txt").toPath().toFile());
+    }
+
     @PlatformMarker
     private static boolean isTeaVM() {
         return false;

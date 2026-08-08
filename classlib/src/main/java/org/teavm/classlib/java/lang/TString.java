@@ -17,6 +17,7 @@ package org.teavm.classlib.java.lang;
 
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Objects;
 import org.teavm.classlib.PlatformDetector;
@@ -30,8 +31,12 @@ import org.teavm.classlib.java.util.TArrays;
 import org.teavm.classlib.java.util.TComparator;
 import org.teavm.classlib.java.util.TFormatter;
 import org.teavm.classlib.java.util.TLocale;
+import org.teavm.classlib.java.util.TSpliterator;
+import org.teavm.classlib.java.util.TSpliterators;
 import org.teavm.classlib.java.util.regex.TPattern;
 import org.teavm.classlib.java.util.stream.TIntStream;
+import org.teavm.classlib.java.util.stream.TStream;
+import org.teavm.classlib.java.util.stream.TStreamSupport;
 import org.teavm.classlib.java.util.stream.intimpl.TStringCharsStream;
 import org.teavm.classlib.java.util.stream.intimpl.TStringCodePointsStream;
 import org.teavm.dependency.PluggableDependency;
@@ -614,6 +619,34 @@ public final class TString extends TObject implements TSerializable, TComparable
     @Override
     public TIntStream codePoints() {
         return new TStringCodePointsStream(this);
+    }
+
+    public TStream<TString> lines() {
+        var lines = new ArrayList<TString>();
+        int length = charactersLength();
+        int start = 0;
+        int index = 0;
+        while (index < length) {
+            char c = charactersGet(index);
+            if (c == '\n') {
+                lines.add(substring(start, index));
+                start = ++index;
+            } else if (c == '\r') {
+                lines.add(substring(start, index));
+                ++index;
+                if (index < length && charactersGet(index) == '\n') {
+                    ++index;
+                }
+                start = index;
+            } else {
+                ++index;
+            }
+        }
+        // A terminator ends the last line rather than starting an empty one.
+        if (start < length) {
+            lines.add(substring(start, length));
+        }
+        return TStreamSupport.stream(TSpliterators.spliterator(lines, TSpliterator.ORDERED), false);
     }
 
     public static String valueOf(Object obj) {

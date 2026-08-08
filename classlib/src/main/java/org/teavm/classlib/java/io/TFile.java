@@ -24,6 +24,8 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Objects;
 import org.teavm.classlib.java.lang.TSystem;
+import org.teavm.classlib.java.nio.file.TPath;
+import org.teavm.classlib.java.nio.file.TPaths;
 import org.teavm.classlib.java.util.TRandom;
 import org.teavm.runtime.fs.VirtualFile;
 import org.teavm.runtime.fs.VirtualFileSystem;
@@ -113,6 +115,10 @@ public class TFile implements Serializable, Comparable<TFile> {
 
     public String getPath() {
         return path;
+    }
+
+    public TPath toPath() {
+        return TPaths.get(path);
     }
 
     public String getName() {
