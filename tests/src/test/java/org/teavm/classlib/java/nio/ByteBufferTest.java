@@ -424,6 +424,19 @@ public class ByteBufferTest {
     }
 
     @Test
+    public void putsOtherBuffer() {
+        var dst = ByteBuffer.allocate(16);
+        dst.putShort((short) 0x1234);
+        var src = ByteBuffer.wrap(new byte[] { 1, 2, 3, 4 });
+        dst.put(src);
+        dst.flip();
+
+        var check = new byte[6];
+        dst.get(0, check);
+        assertArrayEquals(new byte[] { 0x12, 0x34, 1, 2, 3, 4 }, check);
+    }
+
+    @Test
     public void compacts() {
         byte[] array = {2, 3, 5, 7};
         ByteBuffer buffer = ByteBuffer.wrap(array);
@@ -799,5 +812,18 @@ public class ByteBufferTest {
                 assertEquals((byte) n++, buffer.get());
             }
         }
+    }
+
+    @Test
+    public void putToDirect() {
+        var buffer = ByteBuffer.allocateDirect(2);
+        var src = ByteBuffer.wrap(new byte[] { 1, 2 });
+        src.get();
+        buffer.put(src);
+        buffer.flip();
+
+        var check = new byte[1];
+        buffer.get(check);
+        assertArrayEquals(new byte[] { 2 }, check);
     }
 }

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2018 Alexey Andreev.
+ *  Copyright 2026 Alexey Andreev.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,17 +13,22 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.teavm.tooling.daemon;
+package org.teavm.jso.webgpu;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import org.teavm.callgraph.CallGraph;
-import org.teavm.diagnostics.Problem;
+import org.teavm.jso.JSObject;
+import org.teavm.jso.JSProperty;
+import org.teavm.jso.dom.html.HTMLCanvasElement;
 
-public class RemoteBuildResponse implements Serializable {
-    public CallGraph callGraph;
-    public final List<Problem> problems = new ArrayList<>();
-    public final List<Problem> severeProblems = new ArrayList<>();
-    public Throwable exception;
+public interface GPUCanvasContext extends JSObject {
+    @JSProperty
+    HTMLCanvasElement getCanvas();
+
+    void configure(GPUDescriptor.CanvasConfiguration configuration);
+
+    void unconfigure();
+
+    GPUDescriptor.CanvasConfiguration getConfiguration();
+
+    GPUTexture getCurrentTexture();
 }
+
