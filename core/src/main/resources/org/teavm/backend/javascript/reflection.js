@@ -27,6 +27,9 @@ let $rt_enumConstants = cls => {
 let $rt_isInstance = (obj, cls) => obj instanceof $rt_objcls() && !!obj.constructor[$rt_meta]
     && $rt_isAssignable(obj.constructor, cls);
 let $rt_isAssignable = (from, to) => {
+    if (to === $rt_objcls()) {
+        return from[$rt_meta].primitiveKind === 0;
+    }
     if (from === to) {
         return true;
     }
@@ -104,7 +107,7 @@ let $rt_callMethod = (method, instance, args) => {
     if (isCalledDirectly) {
         argsToPass.push(instance);
     }
-    for (let i = 0; i < args.data.length; ++i) {
+    for (let i = 0; i < method.parameterTypes.length; ++i) {
         argsToPass.push(method.parameterTypes[i][$rt_meta].objectToValue(args.data[i]));
     }
     let caller = isStatic || isCalledDirectly ? method.caller : method.caller(instance);

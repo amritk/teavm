@@ -1,5 +1,5 @@
 /*
- *  Copyright 2018 Alexey Andreev.
+ *  Copyright 2026 Alexey Andreev.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,12 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.teavm.tooling.daemon;
+package org.teavm.jso.webgpu;
 
-public interface DaemonLog {
-    void error(String message);
-
-    void error(String message, Throwable e);
-
-    void info(String message);
+public interface GPUBindGroup extends GPU.ObjectBase {
+    interface Layout extends GPU.ObjectBase {
+    }
 }
+

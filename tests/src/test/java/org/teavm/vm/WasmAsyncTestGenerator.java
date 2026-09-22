@@ -35,32 +35,112 @@ public class WasmAsyncTestGenerator implements WasmGCBodyIntrinsic {
 
     @Override
     public void apply(MethodReference method, WasmFunction function) {
-        var param = new WasmLocal(WasmType.INT32, "n");
-        var generator = new Generator(context, param);
         switch (method.getName()) {
             case "generatedMethod":
-                function.add(param);
-                generator.generate(function.getBody().builder());
+                new Generator(addParam(function)).generate(function.getBody().builder());
                 break;
             case "loopAfterBranch":
-                function.add(param);
-                generator.generateLoopAfterBranch(function.getBody().builder());
+                generateLoopAfterBranch(function, addParam(function));
                 break;
             case "loopAfterThrow":
-                function.add(param);
-                generator.generateLoopAfterThrow(function.getBody().builder());
+                generateLoopAfterThrow(function, addParam(function));
                 break;
-            default:
+            case "teeThenSuspend":
+                generateTeeThenSuspend(function);
                 break;
         }
     }
 
-    private static class Generator {
-        final WasmGCCodeGenContext context;
+    private static WasmLocal addParam(WasmFunction function) {
+        var param = new WasmLocal(WasmType.INT32, "n");
+        function.add(param);
+        return param;
+    }
+
+    // A suspending loop that follows a block whose body ends with a branch. The branch empties the
+    // type stack, so a stale depth recorded by an earlier instruction indexes an empty snapshot.
+    private void generateLoopAfterBranch(WasmFunction function, WasmLocal param) {
+        var outer = function.getBody().builder().block(WasmType.INT32);
+        escapeIfNonZero(outer, param);
+        outer.block()
+                .i32Const(1)
+                .i32Const(2)
+                .call(sumFn(), true)
+                .i32Const(7)
+                .breakTo(outer.list);
+        suspendingLoop(outer);
+        outer.i32Const(0);
+    }
+
+    // Same shape, with the type stack emptied by throw instead of by a branch. This is what Kotlin
+    // coroutine state machines produce.
+    private void generateLoopAfterThrow(WasmFunction function, WasmLocal param) {
+        var outer = function.getBody().builder().block(WasmType.INT32);
+        escapeIfNonZero(outer, param);
+        outer.block()
+                .i32Const(1)
+                .i32Const(2)
+                .call(sumFn(), true)
+                .drop()
+                .call(newExceptionFn(), false)
+                .throw_(context.exceptionTag());
+        suspendingLoop(outer);
+        outer.i32Const(0);
+    }
+    
+    private void generateTeeThenSuspend(WasmFunction function) {
+        var throwableType = context.classInfoProvider().getClassInfo("java.lang.Throwable").getType();
+        var wider = new WasmLocal(throwableType, "wider");
+        var sum = new WasmLocal(WasmType.INT32, "sum");
+        function.add(wider);
+        function.add(sum);
+        
+        function.getBody().builder()
+                .call(newExceptionFn(), false)
+                .teeLocal(wider)
+                .i32Const(20)
+                .i32Const(25)
+                .call(sumFn(), true)
+                .setLocal(sum)
+                .call(lengthOfFn(), false)
+                .getLocal(sum)
+                .intBinary(WasmIntType.INT32, WasmIntBinaryOperation.ADD);
+    }
+
+    private void escapeIfNonZero(WasmInstructionBuilder outer, WasmLocal param) {
+        outer.getLocal(param);
+        outer.conditional().getThenBlock().builder()
+                .i32Const(100)
+                .breakTo(outer.list);
+    }
+
+    private void suspendingLoop(WasmInstructionBuilder builder) {
+        builder.loop()
+                .i32Const(1)
+                .i32Const(2)
+                .call(sumFn(), true)
+                .drop();
+    }
+
+    private WasmFunction sumFn() {
+        return context.functions().forStaticMethod(new MethodReference(WasmAsyncTest.class, "sum", int.class,
+                int.class, int.class));
+    }
+
+    private WasmFunction newExceptionFn() {
+        return context.functions().forStaticMethod(new MethodReference(WasmAsyncTest.class, "newException",
+                RuntimeException.class));
+    }
+
+    private WasmFunction lengthOfFn() {
+        return context.functions().forStaticMethod(new MethodReference(WasmAsyncTest.class, "lengthOf",
+                Throwable.class, int.class));
+    }
+
+    private class Generator {
         final WasmLocal param;
 
-        Generator(WasmGCCodeGenContext context, WasmLocal param) {
-            this.context = context;
+        Generator(WasmLocal param) {
             this.param = param;
         }
 
@@ -99,75 +179,9 @@ public class WasmAsyncTestGenerator implements WasmGCBodyIntrinsic {
             builder.intBinary(WasmIntType.INT32, WasmIntBinaryOperation.ADD);
         }
 
-        /*
-         * A suspending loop that follows a suspending block whose body ends with a branch. The
-         * branch empties the type stack, and neither it nor the untyped loop records the depth of
-         * the stack they leave behind, so the coroutine transformation used to see the depth
-         * recorded by the i32.const two instructions earlier and index the (by then empty) stack
-         * snapshot with it.
-         */
-        void generateLoopAfterBranch(WasmInstructionBuilder builder) {
-            var outer = builder.block(WasmType.INT32);
-            escapeIfNonZero(outer);
-            var branching = outer.block();
-            branching
-                    .i32Const(1)
-                    .i32Const(2)
-                    .call(sumFn(), true)
-                    .i32Const(7)
-                    .breakTo(outer.list);
-            suspendingLoop(outer);
-            outer.i32Const(0);
-        }
-
-        /*
-         * Same shape, with the type stack emptied by throw instead of by a branch. This is what
-         * Kotlin coroutine state machines produce in practice.
-         */
-        void generateLoopAfterThrow(WasmInstructionBuilder builder) {
-            var outer = builder.block(WasmType.INT32);
-            escapeIfNonZero(outer);
-            var throwing = outer.block();
-            throwing
-                    .i32Const(1)
-                    .i32Const(2)
-                    .call(sumFn(), true)
-                    .drop()
-                    .call(newExceptionFn(), false)
-                    .throw_(context.exceptionTag());
-            suspendingLoop(outer);
-            outer.i32Const(0);
-        }
-
-        private void escapeIfNonZero(WasmInstructionBuilder outer) {
-            outer.getLocal(param);
-            var conditional = outer.conditional();
-            conditional.getThenBlock().builder()
-                    .i32Const(100)
-                    .breakTo(outer.list);
-        }
-
-        private void suspendingLoop(WasmInstructionBuilder builder) {
-            builder.loop()
-                    .i32Const(1)
-                    .i32Const(2)
-                    .call(sumFn(), true)
-                    .drop();
-        }
-
         private void block(WasmInstructionBuilder builder, Consumer<WasmInstructionBuilder> body) {
             var block = builder.block(WasmType.INT32);
             body.accept(block);
-        }
-
-        private WasmFunction sumFn() {
-            return context.functions().forStaticMethod(new MethodReference(WasmAsyncTest.class, "sum", int.class,
-                    int.class, int.class));
-        }
-
-        private WasmFunction newExceptionFn() {
-            return context.functions().forStaticMethod(new MethodReference(WasmAsyncTest.class, "newException",
-                    RuntimeException.class));
         }
     }
 }

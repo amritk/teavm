@@ -16,9 +16,11 @@
 package org.teavm.vm;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.IntSupplier;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -29,6 +31,7 @@ import org.teavm.jso.browser.Window;
 import org.teavm.jso.core.JSPromise;
 import org.teavm.jso.core.JSString;
 import org.teavm.junit.EachTestCompiledSeparately;
+import org.teavm.junit.OnlyPlatform;
 import org.teavm.junit.SkipJVM;
 import org.teavm.junit.SkipPlatform;
 import org.teavm.junit.TeaVMTestRunner;
@@ -58,7 +61,7 @@ public class AsyncTest {
         assertEquals(3, str.getLength());
         assertEquals("foo", str.stringValue());
     }
-    
+
     @Test
     public void switchAsyncArgument() {
         var sb = new StringBuilder();
@@ -77,12 +80,12 @@ public class AsyncTest {
         }
         assertEquals("zero;one;other;other;", sb.toString());
     }
-    
+
     @Test
     public void doublePrimitive() {
         assertEquals(2.5, returnSamePrimitive(2.5), 0.01);
     }
-    
+
     @Test
     public void conditionalBranch() {
         var list = List.of(1, 2);
@@ -92,7 +95,36 @@ public class AsyncTest {
         }
         assertEquals("23;42;", sb.toString());
     }
-    
+
+    @Test
+    public void conditionalBranchOfDistinctTypesBeforeSuspension() {
+        var sb = new StringBuilder();
+        for (var i = 0; i < 2; ++i) {
+            sb.append(describe(i == 0 ? "foo" : returnSameObject(this), getPrimitive())).append(";");
+        }
+        for (var i = 0; i < 2; ++i) {
+            sb.append(describe(i == 0 ? returnSameObject(this) : "foo", getPrimitive())).append(";");
+        }
+        assertEquals("string:23;other:23;other:23;string:23;", sb.toString());
+    }
+
+    private static String describe(Object o, int n) {
+        return (o instanceof String ? "string" : "other") + ":" + n;
+    }
+
+    @Test
+    public void constantBeneathSuspendingConditional() {
+        var sb = new StringBuilder();
+        for (var i = 0; i < 2; ++i) {
+            sb.append(describeValue("foo", i == 0 ? getPrimitive() : 5)).append(";");
+        }
+        assertEquals("foo:23;foo:5;", sb.toString());
+    }
+
+    private static String describeValue(Object o, int n) {
+        return o + ":" + n;
+    }
+
     @Test
     public void passStringConstant() {
         assertEquals("foo", returnSamePrimitive("foo"));
@@ -132,7 +164,7 @@ public class AsyncTest {
         list.addAll(toAdd);
         assertEquals(List.of("q", "w"), list);
     }
-    
+
     @Test
     @SkipPlatform(TestPlatform.C)
     public void awaitPromise() {
@@ -142,16 +174,23 @@ public class AsyncTest {
         assertEquals("ok", promise.await());
     }
 
+    @Test
+    @OnlyPlatform({ TestPlatform.JAVASCRIPT, TestPlatform.WEBASSEMBLY_GC })
+    public void suspendFunctionFromJs() {
+        assertEquals(23, wrapWithJsCall(() -> perhapsSuspend(false, 23)));
+        assertThrows(RuntimeException.class, () -> wrapWithJsCall(() -> perhapsSuspend(true, 42)));
+    }
+
     @Async
     private native JSString getJsString();
 
     private void getJsString(AsyncCallback<JSString> callback) {
         setTimeout(() -> callback.complete(JSString.valueOf("foo")));
     }
-    
+
     @Async
     private native int returnSamePrimitive(int value);
-    
+
     private void returnSamePrimitive(int value, AsyncCallback<Integer> callback) {
         setTimeout(() -> callback.complete(value));
     }
@@ -162,19 +201,50 @@ public class AsyncTest {
     private void returnSamePrimitive(double value, AsyncCallback<Double> callback) {
         setTimeout(() -> callback.complete(value));
     }
-    
+
+    @Async
+    private native Object returnSameObject(Object value);
+
+    private void returnSameObject(Object value, AsyncCallback<Object> callback) {
+        setTimeout(() -> callback.complete(value));
+    }
+
     @Async
     private native String returnSamePrimitive(String value);
 
     private void returnSamePrimitive(String value, AsyncCallback<String> callback) {
         setTimeout(() -> callback.complete(value));
     }
-    
+
     private void setTimeout(Runnable callback) {
         if (PlatformDetector.isC()) {
             EventQueue.offer(callback::run);
         } else {
             Window.setTimeout(callback::run, 0);
         }
+    }
+
+    private int perhapsSuspend(boolean shouldSuspend, int value) {
+        if (shouldSuspend) {
+            try {
+                Thread.sleep(0);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return value;
+    }
+    
+    @Async
+    private static native int wrapWithJsCall(IntSupplier fn);
+    
+    private static void wrapWithJsCall(IntSupplier fn, AsyncCallback<Integer> callback) {
+        Window.setTimeout(() -> {
+            try {
+                callback.complete(fn.getAsInt());
+            } catch (Throwable e) {
+                callback.error(e);
+            }
+        }, 0);
     }
 }
