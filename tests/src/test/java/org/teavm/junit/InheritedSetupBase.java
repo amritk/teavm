@@ -1,5 +1,5 @@
 /*
- *  Copyright 2018 Alexey Andreev.
+ *  Copyright 2026 Alexey Andreev.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,20 +13,24 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.teavm.tests;
+package org.teavm.junit;
 
-import org.junit.runner.RunWith;
-import org.teavm.junit.TeaVMTestRunner;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 
-@RunWith(TeaVMTestRunner.class)
-public class JUnit3DerivedTest extends JUnit3BaseTest {
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        b = "derived";
+public abstract class InheritedSetupBase {
+    protected int setupCount;
+    protected int teardownCount;
+
+    @BeforeEach
+    public void countSetup() {
+        setupCount++;
     }
 
-    public void testBar() {
-        assertEquals("derived", b);
+    @AfterEach
+    public void countTeardown() {
+        if (++teardownCount > 1) {
+            throw new AssertionError("@After ran " + teardownCount + " times");
+        }
     }
 }

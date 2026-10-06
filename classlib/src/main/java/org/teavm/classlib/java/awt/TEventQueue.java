@@ -16,7 +16,10 @@
 package org.teavm.classlib.java.awt;
 
 /** There is no event dispatch thread, so nothing is ever on it. */
-public class TEventQueue {
+public final class TEventQueue {
+    private TEventQueue() {
+    }
+
     public static boolean isDispatchThread() {
         return false;
     }

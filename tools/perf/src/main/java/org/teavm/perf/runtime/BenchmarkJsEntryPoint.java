@@ -1,5 +1,5 @@
 /*
- *  Copyright 2018 Alexey Andreev.
+ *  Copyright 2026 Alexey Andreev.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -13,21 +13,18 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.teavm.tests;
+package org.teavm.perf.runtime;
 
-import junit.framework.TestCase;
-
-public abstract class JUnit3BaseTest extends TestCase {
-    String a;
-    String b;
-
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-        a = "start";
+public final class BenchmarkJsEntryPoint {
+    private BenchmarkJsEntryPoint() {
     }
 
-    public void testFoo() {
-        assertEquals("start", a);
+    public static void main(String[] args) throws Throwable {
+        try {
+            BenchmarkEntryPoint.run(args.length > 0 ? args[0] : "");
+        } catch (Throwable e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 }

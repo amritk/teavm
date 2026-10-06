@@ -18,6 +18,9 @@ package org.teavm.classlib.java.lang.invoke;
 import java.io.Serializable;
 
 public final class TMethodType implements Serializable {
+    private TMethodType() {
+    }
+
     public static TMethodType methodType(Class<?> rtype) {
         throw new UnsupportedOperationException("MethodHandles cannot be resolved ahead of time");
     }
