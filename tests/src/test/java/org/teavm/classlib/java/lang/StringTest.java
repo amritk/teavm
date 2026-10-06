@@ -15,22 +15,21 @@
  */
 package org.teavm.classlib.java.lang;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.UnsupportedEncodingException;
 import java.util.Locale;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
 import org.teavm.junit.EachTestCompiledSeparately;
 import org.teavm.junit.SkipPlatform;
-import org.teavm.junit.TeaVMTestRunner;
+import org.teavm.junit.TeaVMTest;
 import org.teavm.junit.TestPlatform;
 
-@RunWith(TeaVMTestRunner.class)
+@TeaVMTest
 @EachTestCompiledSeparately
 public class StringTest {
     @Test
@@ -200,6 +199,22 @@ public class StringTest {
         assertEquals("xaxaxax", "aaa".replace("", "x"));
         assertEquals("axc", "abc".replace("b", "x"));
         assertEquals("abc", "abc".replace("bc", "bc"));
+        assertEquals("xyzbxyz", "abcbabc".replace("abc", "xyz"));
+        assertEquals("[]b[]b[]", "aabaabaa".replace("aa", "[]"));
+        assertEquals("--", "abcabc".replace("abc", "-"));
+        assertEquals("", "abcabc".replace("abc", ""));
+        assertEquals("aXYZXYZb", "a12b".replace(new StringBuilder("1"), "XYZ").replace("2", "XYZ"));
+        assertEquals("ab", "ab".replace("abc", "x"));
+        assertEquals("[]b[]", "aabaa".replace(new StringBuilder("aa"), new StringBuilder("[]")));
+        assertEquals("-b-", "aabaa".replace(new StringBuilder("aa"), "-"));
+        assertSame("ab", "ab".replace(new StringBuilder("ac"), "x"));
+    }
+
+    @Test
+    public void sequenceReplaceReturnsSameStringWhenNotFound() {
+        var s = new String(new char[] { 'a', 'b', 'c' });
+        assertSame(s, s.replace("bd", "x"));
+        assertSame(s, s.replace("d", "x"));
     }
 
     @Test
