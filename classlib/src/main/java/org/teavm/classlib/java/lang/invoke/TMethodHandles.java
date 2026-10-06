@@ -15,7 +15,10 @@
  */
 package org.teavm.classlib.java.lang.invoke;
 
-public class TMethodHandles {
+public final class TMethodHandles {
+    private TMethodHandles() {
+    }
+
     /**
      * Enough shape for code that acquires a Lookup and hands it around. Actually
      * resolving a handle is what a closed world cannot do, so every lookup

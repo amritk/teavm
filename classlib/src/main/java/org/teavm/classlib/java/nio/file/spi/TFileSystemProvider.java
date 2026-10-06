@@ -47,8 +47,8 @@ public abstract class TFileSystemProvider {
      * Non-abstract on the JDK too: a provider that cannot open a channel says so
      * rather than forcing every provider to implement one.
      */
-    public java.nio.channels.FileChannel newFileChannel(TPath path, Set<? extends org.teavm.classlib.java.nio.file.TOpenOption> options,
-            org.teavm.classlib.java.nio.file.attribute.TFileAttribute<?>... attrs) throws IOException {
+    public java.nio.channels.FileChannel newFileChannel(TPath path, Set<? extends TOpenOption> options,
+            TFileAttribute<?>... attrs) throws IOException {
         throw new UnsupportedOperationException();
     }
 
@@ -74,7 +74,7 @@ public abstract class TFileSystemProvider {
     public abstract TDirectoryStream<TPath> newDirectoryStream(TPath dir,
             TDirectoryStream.Filter<? super TPath> filter) throws IOException;
 
-    public abstract void createDirectory(TPath dir, org.teavm.classlib.java.nio.file.attribute.TFileAttribute<?>... attrs) throws IOException;
+    public abstract void createDirectory(TPath dir, TFileAttribute<?>... attrs) throws IOException;
 
     public abstract void delete(TPath path) throws IOException;
 
