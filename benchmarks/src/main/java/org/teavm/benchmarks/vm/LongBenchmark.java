@@ -34,8 +34,8 @@ import org.openjdk.jmh.annotations.Warmup;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Warmup(iterations = 5, time = 1)
-@Measurement(iterations = 5, time = 1)
+@Warmup(iterations = 3, time = 300, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Fork(1)
 public class LongBenchmark {
     private static final int SIZE = 1024;
@@ -136,6 +136,24 @@ public class LongBenchmark {
         var result = 0L;
         for (var i = 0; i < SIZE; ++i) {
             result ^= longs[i] << ints[i];
+        }
+        return result;
+    }
+
+    @Benchmark
+    public long variableShiftRight() {
+        var result = 0L;
+        for (var i = 0; i < SIZE; ++i) {
+            result ^= longs[i] >> ints[i];
+        }
+        return result;
+    }
+
+    @Benchmark
+    public long variableShiftRightUnsigned() {
+        var result = 0L;
+        for (var i = 0; i < SIZE; ++i) {
+            result ^= longs[i] >>> ints[i];
         }
         return result;
     }

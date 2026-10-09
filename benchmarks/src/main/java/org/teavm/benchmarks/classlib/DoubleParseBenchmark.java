@@ -36,51 +36,68 @@ import org.openjdk.jmh.annotations.Warmup;
 @Warmup(iterations = 3, time = 300, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Fork(1)
-public class StringBuilderBenchmark {
+public class DoubleParseBenchmark {
     private static final int COUNT = 256;
 
     /**
-     * Kind of values to append:
+     * Kind of strings to parse:
      * <ul>
-     *   <li>{@code short}: values with few significant digits, like 0.5 or 12.25;</li>
-     *   <li>{@code random}: random values between 0 and 1000, requiring 15-17 significant digits;</li>
-     *   <li>{@code exponent}: values that are formatted in scientific notation.</li>
+     *   <li>{@code short}: numbers with few significant digits, like 0.5 or 12.25;</li>
+     *   <li>{@code random}: numbers between 0 and 1000 with 17 significant digits;</li>
+     *   <li>{@code exponent}: numbers with 17 significant digits in scientific notation.</li>
      * </ul>
+     * Strings are generated from random digits rather than by {@code Double.toString}, so that
+     * the input does not depend on implementation of double formatting.
      */
     @Param({ "short", "random", "exponent" })
     public String kind;
 
-    private double[] values;
-    private StringBuilder sb = new StringBuilder();
+    private String[] values;
 
     @Setup
     public void setup() {
         var random = new Random(42);
-        values = new double[COUNT];
+        values = new String[COUNT];
         for (var i = 0; i < COUNT; ++i) {
+            var sb = new StringBuilder();
             switch (kind) {
                 case "short":
-                    values[i] = random.nextInt(10000) / 4.0;
+                    sb.append(random.nextInt(2500)).append('.').append(random.nextInt(4) * 25);
                     break;
-                case "random":
-                    values[i] = random.nextDouble() * 1000;
+                case "random": {
+                    var intDigits = 1 + random.nextInt(3);
+                    appendDigits(sb, random, intDigits);
+                    sb.append('.');
+                    appendDigits(sb, random, 17 - intDigits);
                     break;
+                }
                 case "exponent":
-                    values[i] = random.nextDouble() * Math.pow(10, random.nextInt(600) - 300);
+                    appendDigits(sb, random, 1);
+                    sb.append('.');
+                    appendDigits(sb, random, 16);
+                    sb.append('E').append(random.nextInt(600) - 300);
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown kind: " + kind);
             }
+            values[i] = sb.toString();
+        }
+    }
+
+    private static void appendDigits(StringBuilder sb, Random random, int count) {
+        sb.append((char) ('1' + random.nextInt(9)));
+        for (var i = 1; i < count; ++i) {
+            sb.append((char) ('0' + random.nextInt(10)));
         }
     }
 
     @Benchmark
     @OperationsPerInvocation(COUNT)
-    public int appendDouble() {
-        sb.setLength(0);
+    public double parseDouble() {
+        var result = 0.0;
         for (var value : values) {
-            sb.append(value);
+            result += Double.parseDouble(value);
         }
-        return sb.length();
+        return result;
     }
 }
