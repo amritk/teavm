@@ -32,8 +32,8 @@ import org.openjdk.jmh.infra.Blackhole;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Warmup(iterations = 5, time = 1)
-@Measurement(iterations = 5, time = 1)
+@Warmup(iterations = 3, time = 300, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Fork(1)
 public class StringSplitBenchmark {
     @Param({ "4", "64" })
@@ -41,6 +41,7 @@ public class StringSplitBenchmark {
 
     private String commaSeparated;
     private String commaSpaceSeparated;
+    private String comma;
 
     @Setup
     public void setup() {
@@ -57,6 +58,7 @@ public class StringSplitBenchmark {
         }
         commaSeparated = comma.toString();
         commaSpaceSeparated = commaSpace.toString();
+        this.comma = new StringBuilder(",").toString();
     }
 
     /**
@@ -65,6 +67,14 @@ public class StringSplitBenchmark {
     @Benchmark
     public void splitSingleChar(Blackhole blackhole) {
         blackhole.consume(commaSeparated.split(","));
+    }
+
+    /**
+     * Same as {@link #splitSingleChar(Blackhole)}, but separator is not known at compile time.
+     */
+    @Benchmark
+    public void splitSingleCharDynamic(Blackhole blackhole) {
+        blackhole.consume(commaSeparated.split(comma));
     }
 
     /**

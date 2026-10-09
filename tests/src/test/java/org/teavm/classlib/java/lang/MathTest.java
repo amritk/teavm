@@ -218,6 +218,34 @@ public class MathTest {
     }
 
     @Test
+    public void nextAfterWorks() {
+        sameDouble(1.0000000000000002, Math.nextAfter(1.0, 2.0));
+        sameDouble(0.9999999999999999, Math.nextAfter(1.0, 0.0));
+        sameDouble(-0.0, Math.nextAfter(0.0, -0.0));
+        sameDouble(Double.NaN, Math.nextAfter(1.0, Double.NaN));
+        sameDouble(Double.NaN, Math.nextAfter(Double.NaN, 1.0));
+        sameFloat(1.0000001f, Math.nextAfter(1.0f, 2.0));
+        sameFloat(0.99999994f, Math.nextAfter(1.0f, 0.0));
+        sameFloat(-0.0f, Math.nextAfter(0.0f, -0.0));
+        sameFloat(Float.NaN, Math.nextAfter(1.0f, Double.NaN));
+        sameFloat(Float.NaN, Math.nextAfter(Float.NaN, 1.0));
+    }
+
+    @Test
+    public void hypotWorks() {
+        assertEquals(5.0, Math.hypot(3.0, 4.0), 0.0);
+        assertEquals(1.414213562373095E200, Math.hypot(1E200, 1E200), 1E185);
+        assertEquals(1.414213562373095E-200, Math.hypot(1E-200, -1E-200), 1E-215);
+        assertEquals(5E300, Math.hypot(3E300, 4E300), 1E285);
+        assertEquals(1E300, Math.hypot(1E300, 1E-300), 1E285);
+        sameDouble(Double.MAX_VALUE, Math.hypot(Double.MAX_VALUE, 0.0));
+        sameDouble(Double.MIN_VALUE, Math.hypot(0.0, Double.MIN_VALUE));
+        sameDouble(Double.POSITIVE_INFINITY, Math.hypot(Double.POSITIVE_INFINITY, Double.NaN));
+        sameDouble(Double.POSITIVE_INFINITY, Math.hypot(Double.NaN, Double.NEGATIVE_INFINITY));
+        sameDouble(Double.NaN, Math.hypot(Double.NaN, 1.0));
+    }
+
+    @Test
     public void exponentWorks() {
         assertEquals(0, Math.getExponent(1.0f));
         assertEquals(-127, Math.getExponent(Float.MIN_VALUE));
