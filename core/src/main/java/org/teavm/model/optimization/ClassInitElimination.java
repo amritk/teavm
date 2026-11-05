@@ -32,9 +32,11 @@ import org.teavm.model.util.ProgramUtils;
 public class ClassInitElimination implements MethodOptimization {
     @Override
     public boolean optimize(MethodOptimizationContext context, Program program) {
-        Graph cfg = ProgramUtils.buildControlFlowGraph(program);
+        // Node 2 * i is the entry of block i, and node 2 * i + 1 is its body. Exception handlers are connected
+        // to the entry node, because an exception can leave a block before any of its instructions run.
+        Graph cfg = ProgramUtils.buildControlFlowGraph2(program);
         DominatorTree dom = GraphUtils.buildDominatorTree(cfg);
-        Graph domGraph = GraphUtils.buildDominatorGraph(dom, program.basicBlockCount());
+        Graph domGraph = GraphUtils.buildDominatorGraph(dom, cfg.size());
 
         Step start = new Step(0);
         Deque<Step> stack = new ArrayDeque<>();
@@ -43,31 +45,33 @@ public class ClassInitElimination implements MethodOptimization {
         while (!stack.isEmpty()) {
             Step step = stack.pop();
             int node = step.node;
-            BasicBlock block = program.basicBlockAt(node);
 
-            Instruction nextInsn;
-            for (Instruction insn = block.getFirstInstruction(); insn != null; insn = nextInsn) {
-                nextInsn = insn.getNext();
-                if (insn instanceof InitClassInstruction) {
-                    InitClassInstruction initClass = (InitClassInstruction) insn;
-                    if (!step.initializedClasses.add(initClass.getClassName())) {
-                        insn.delete();
+            if (node % 2 == 1) {
+                BasicBlock block = program.basicBlockAt(node / 2);
+                Instruction nextInsn;
+                for (Instruction insn = block.getFirstInstruction(); insn != null; insn = nextInsn) {
+                    nextInsn = insn.getNext();
+                    if (insn instanceof InitClassInstruction) {
+                        InitClassInstruction initClass = (InitClassInstruction) insn;
+                        if (!step.initializedClasses.add(initClass.getClassName())) {
+                            insn.delete();
+                        }
+                        continue;
                     }
-                    continue;
-                }
-                if (insn instanceof InvokeInstruction) {
-                    InvokeInstruction invoke = (InvokeInstruction) insn;
-                    // Only a static call initializes the class it names:
-                    // ClassInitializerInsertionTransformer puts the initializer
-                    // call at the top of static methods and constructors, not
-                    // instance methods, and an interface call initializes the
-                    // receiver's class rather than the interface. Counting
-                    // instance calls here deleted the initializer that a later
-                    // read of the same class's static field depended on.
-                    // ClassInitInsertion, which puts these instructions in, uses
-                    // exactly this condition.
-                    if (invoke.getInstance() == null) {
-                        step.initializedClasses.add(invoke.getMethod().getClassName());
+                    if (insn instanceof InvokeInstruction) {
+                        InvokeInstruction invoke = (InvokeInstruction) insn;
+                        // Only a static call initializes the class it names:
+                        // ClassInitializerInsertionTransformer puts the initializer
+                        // call at the top of static methods and constructors, not
+                        // instance methods, and an interface call initializes the
+                        // receiver's class rather than the interface. Counting
+                        // instance calls here deleted the initializer that a later
+                        // read of the same class's static field depended on.
+                        // ClassInitInsertion, which puts these instructions in, uses
+                        // exactly this condition.
+                        if (invoke.getInstance() == null) {
+                            step.initializedClasses.add(invoke.getMethod().getClassName());
+                        }
                     }
                 }
             }
