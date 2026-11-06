@@ -431,13 +431,8 @@ public class TObject {
         waitImpl(timeout, nanos);
     }
 
-    // Single-threaded build: no other thread can ever call notify, and the event
-    // queue that would deliver a timeout never gets a turn, so this can only
-    // block forever. It throws for the same reason take() on an empty queue
-    // does. Not @Async - see patches/README.md.
-    private void waitImpl(long timeout, int nanos) throws TInterruptedException {
-        throw new TUnsupportedOperationException("Object.wait cannot be satisfied with one thread");
-    }
+    @Async
+    private native void waitImpl(long timeout, int nanos) throws TInterruptedException;
 
     final void waitImpl(long timeout, int nanos, AsyncCallback<Void> callback) {
         Monitor monitor = this.monitor;
