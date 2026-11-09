@@ -348,9 +348,6 @@ public class CoroutineTransformation {
                 replacement.visit(wrapper);
             }
 
-            // Whichever arm was walked last left its own types on the stack, but what the wrapper
-            // block leaves behind is the type it is declared to produce. Recording the arm's types
-            // hands a later suspension point a narrower type than the value it will actually see.
             typeInference.typeStack.clear();
             typeInference.typeStack.addAll(outputTypes);
 

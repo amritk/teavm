@@ -15,7 +15,6 @@
  */
 package org.teavm.dependency;
 
-import com.carrotsearch.hppc.IntHashSet;
 import java.util.Arrays;
 import org.teavm.model.ClassHierarchy;
 import org.teavm.model.ValueType;
@@ -24,7 +23,7 @@ class Transition {
     DependencyNode source;
     DependencyNode destination;
     DependencyTypeFilter filter;
-    IntHashSet pendingTypes;
+    PendingTypes pendingTypes;
     private byte destSubsetOfSrc;
 
     Transition(DependencyNode source, DependencyNode destination, DependencyTypeFilter filter) {
@@ -63,7 +62,7 @@ class Transition {
         }
     }
 
-    private void mergeDomains() {
+    void mergeDomains() {
         // This was called from `propagate`, which delivers types from source to destination
         // However, merging already does this, do we don't need types, passed from `propagate`,
         // they'll be already in the domain
@@ -81,7 +80,7 @@ class Transition {
         destination.dependencyAnalyzer.merging = false;
     }
 
-    private boolean shouldMergeDomains() {
+    boolean shouldMergeDomains() {
         if (!source.dependencyAnalyzer.domainOptimizationEnabled() || filter != null || !isDestSubsetOfSrc()) {
             return false;
         }
