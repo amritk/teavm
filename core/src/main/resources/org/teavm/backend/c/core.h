@@ -119,6 +119,7 @@ extern TeaVM_Object* teavm_getClassObject(TeaVM_Class* cls);
 extern void* teavm_throwClassCastException();
 extern void teavm_throwNullPointerException();
 extern void teavm_throwArrayIndexOutOfBoundsException();
+extern void teavm_throwArithmeticException();
 
 static inline int32_t teavm_isSupertypeOf(TeaVM_Class* superclass, TeaVM_Class* subclass) {
     return superclass->isSupertypeOf(superclass, subclass);
@@ -293,6 +294,15 @@ extern void teavm_initClasses();
 inline static void teavm_gc_writeBarrier(void* object) {
     intptr_t offset = (intptr_t) ((char*) object - (char*) teavm_gc_heapAddress) / teavm_gc_regionSize;
     ((char*) teavm_gc_cardTable)[offset] = 0;
+}
+
+// For objects that may reside outside of the heap (e.g. string literals). Such objects don't need a barrier,
+// since GC traverses them explicitly.
+inline static void teavm_gc_writeBarrierChecked(void* object) {
+    if ((char*) object >= (char*) teavm_gc_heapAddress
+            && (char*) object < (char*) teavm_gc_heapAddress + teavm_gc_availableBytes) {
+        teavm_gc_writeBarrier(object);
+    }
 }
 
 extern void* teavm_fillArray(void* array, ...);

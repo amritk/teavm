@@ -289,6 +289,10 @@ public final class TSystem extends TObject {
         outCache = out;
     }
 
+    @GeneratedBy(SystemNativeGenerator.class)
+    @Intrinsified
+    public static native void exit(int code);
+
     @DelegateTo("gcLowLevel")
     public static void gc() {
         // Do nothing
@@ -324,10 +328,6 @@ public final class TSystem extends TObject {
     
     public static String getenv(String name) {
         return null;
-    }
-
-    public static void exit(int status) {
-        throw new TUnsupportedOperationException("System.exit is not supported");
     }
 
     public static Logger getLogger(String name) {

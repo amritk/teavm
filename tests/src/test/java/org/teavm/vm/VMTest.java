@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 import org.teavm.classlib.PlatformDetector;
@@ -31,6 +33,7 @@ import org.teavm.interop.Async;
 import org.teavm.interop.AsyncCallback;
 import org.teavm.jso.JSBody;
 import org.teavm.jso.JSByRef;
+import org.teavm.junit.AsyncEnabled;
 import org.teavm.junit.EachTestCompiledSeparately;
 import org.teavm.junit.OnlyPlatform;
 import org.teavm.junit.SkipJVM;
@@ -322,6 +325,7 @@ public class VMTest {
     }
 
     @Test
+    @AsyncEnabled
     @SkipJVM
     @SkipPlatform(TestPlatform.C)
     public void asyncClinit() {
@@ -335,12 +339,14 @@ public class VMTest {
     }
 
     @Test
+    @AsyncEnabled
     @SkipPlatform(TestPlatform.C)
     public void asyncClinitField() {
         assertEquals("ok", AsyncClinitClass.state);
     }
 
     @Test
+    @AsyncEnabled
     @SkipPlatform(TestPlatform.C)
     public void asyncClinitInstance() {
         AsyncClinitClass acl = new AsyncClinitClass();
@@ -349,6 +355,7 @@ public class VMTest {
     }
 
     @Test
+    @AsyncEnabled
     @SkipPlatform(TestPlatform.C)
     public void asyncWait() {
         AsyncClinitClass acl = new AsyncClinitClass();
@@ -375,6 +382,7 @@ public class VMTest {
     }
 
     @Test
+    @AsyncEnabled
     @SkipJVM
     public void asyncTryCatch() {
         try {
@@ -386,6 +394,7 @@ public class VMTest {
     }
 
     @Test
+    @AsyncEnabled
     @SkipJVM
     public void asyncExceptionHandler() {
         try {
@@ -562,6 +571,93 @@ public class VMTest {
     }
 
     @Test
+    public void exceptionHandlerChecksNull() {
+        var cell = new Cell();
+        assertEquals("set", setOrClear(new Cell[] { cell }, false));
+        assertEquals("value", cell.value);
+        try {
+            setOrClear(new Cell[] { null }, true);
+            fail("NullPointerException expected");
+        } catch (NullPointerException e) {
+            // expected
+        }
+    }
+
+    private static String setOrClear(Cell[] cells, boolean fail) {
+        var cell = cells[0];
+        try {
+            failIf(fail);
+            cell.set("value");
+            return "set";
+        } catch (IllegalStateException e) {
+            cell.clear();
+            return "cleared " + e.getMessage();
+        }
+    }
+
+    static class Cell {
+        Object value;
+
+        void set(Object value) {
+            this.value = value;
+        }
+
+        void clear() {
+            value = null;
+        }
+    }
+
+    @Test
+    public void exceptionHandlerChecksArrayBounds() {
+        var array = new int[] { 23 };
+        assertEquals(24, readOrDefault(array, 0, () -> 1));
+        try {
+            readOrDefault(array, -1, () -> {
+                throw new IllegalStateException();
+            });
+            fail("ArrayIndexOutOfBoundsException expected");
+        } catch (ArrayIndexOutOfBoundsException e) {
+            // expected
+        }
+    }
+
+    // Offset supplier is polymorphic, so the call isn't inlined and the array access stays
+    // in the same basic block, which is protected by the exception handler. The handler must not
+    // rely on 'index >= 0' proven by the array access in the protected block, since the exception
+    // leaves the block before the access runs. A negative index reveals a missing lower bound check.
+    private static int readOrDefault(int[] array, int index, IntSupplier offset) {
+        try {
+            int n = offset.getAsInt();
+            return array[index] + n;
+        } catch (IllegalStateException e) {
+            return array[index];
+        }
+    }
+
+    @Test
+    public void branchBypassChecksArrayBounds() {
+        var array = new int[] { 23 };
+        assertEquals(23, readIfNonNegativeOr(array, 0, () -> false));
+        try {
+            readIfNonNegativeOr(array, -1, () -> true);
+            fail("ArrayIndexOutOfBoundsException expected");
+        } catch (ArrayIndexOutOfBoundsException e) {
+            // expected
+        }
+    }
+
+    // The array access is dominated by the 'index >= 0' check, but it's also reachable through
+    // the second operand of '||', bypassing the edge where the check holds. Therefore, the lower
+    // bound check must be preserved. Condition supplier is polymorphic to prevent inlining.
+    private static int readIfNonNegativeOr(int[] array, int index, BooleanSupplier condition) {
+        if (0 <= index || condition.getAsBoolean()) {
+            return array[index];
+        }
+        return -1;
+    }
+
+    @Test
+    @AsyncEnabled
     public void arrayMonitor() throws InterruptedException {
         int[] array = { 1, 2, 3 };
         synchronized (array) {
@@ -703,5 +799,264 @@ public class VMTest {
             return "same";
         }
         return "copied " + java.lang.reflect.Array.getLength(copy);
+    }
+
+    @Test
+    public void exceptionHandlerInitializesClass() {
+        assertEquals("B", classInitInHandler(true));
+        assertEquals("A", classInitInHandler(false));
+    }
+
+    private static String classInitInHandler(boolean fail) {
+        try {
+            failIf(fail);
+            return InitInHandler.A.name();
+        } catch (IllegalStateException e) {
+            return InitInHandler.B.name();
+        }
+    }
+
+    private static void failIf(boolean fail) {
+        if (fail) {
+            throw new IllegalStateException();
+        }
+    }
+
+    @Test
+    public void constantIndexBeyondConstantArraySizeThrows() {
+        var array = new int[2];
+        var caught = false;
+        try {
+            array[2] = 1;
+        } catch (ArrayIndexOutOfBoundsException e) {
+            caught = true;
+        }
+        assertTrue(caught, "Exception was not caught (upper bound)");
+
+        caught = false;
+        try {
+            array[-1] = 1;
+        } catch (ArrayIndexOutOfBoundsException e) {
+            caught = true;
+        }
+        assertTrue(caught, "Exception was not caught (lower bound)");
+    }
+
+    @Test
+    public void arithmeticExceptionDeliveredToHandler() {
+        var handled = false;
+        try {
+            divisionResult = 23 / divisor(0);
+        } catch (ArithmeticException e) {
+            // A virtual method that the test harness itself does not call,
+            // so that only the type of the caught exception makes it reachable
+            e.getLocalizedMessage();
+            handled = true;
+        }
+        assertTrue(handled);
+    }
+
+    @Test
+    public void arithmeticExceptionPropagatesToCaller() {
+        var handled = false;
+        try {
+            divisionResult = remainder(23L, divisor(0));
+        } catch (ArithmeticException e) {
+            e.getLocalizedMessage();
+            handled = true;
+        }
+        assertTrue(handled);
+    }
+
+    private static long divisionResult;
+
+    private static int divisor(int value) {
+        return value;
+    }
+
+    private static long remainder(long a, long b) {
+        return a % b;
+    }
+
+    @Test
+    public void arrayIndexOutOfBoundsDeliveredToHandler() {
+        var array = new int[2];
+        var handled = false;
+        try {
+            array[arrayIndex(2)] = 1;
+        } catch (ArrayIndexOutOfBoundsException e) {
+            // A virtual method that the test harness itself does not call,
+            // so that only the type of the caught exception makes it reachable
+            e.getLocalizedMessage();
+            handled = true;
+        }
+        assertTrue(handled);
+    }
+
+    @Test
+    public void arrayIndexOutOfBoundsPropagatesToCaller() {
+        var handled = false;
+        try {
+            storeAt(new int[2], arrayIndex(2));
+        } catch (IndexOutOfBoundsException e) {
+            e.getLocalizedMessage();
+            handled = true;
+        }
+        assertTrue(handled);
+    }
+
+    private static int arrayIndex(int value) {
+        return value;
+    }
+
+    private static void storeAt(int[] array, int index) {
+        array[index] = 1;
+    }
+
+    @Test
+    public void nullPointerExceptionDeliveredToHandler() {
+        var handled = false;
+        try {
+            nullableCell(true).set("x");
+        } catch (NullPointerException e) {
+            // A virtual method that the test harness itself does not call,
+            // so that only the type of the caught exception makes it reachable
+            e.getLocalizedMessage();
+            handled = true;
+        }
+        assertTrue(handled);
+    }
+
+    @Test
+    public void nullPointerExceptionPropagatesToCaller() {
+        var handled = false;
+        try {
+            setOn(nullableCell(true), "x");
+        } catch (NullPointerException e) {
+            e.getLocalizedMessage();
+            handled = true;
+        }
+        assertTrue(handled);
+    }
+
+    private static Cell nullableCell(boolean isNull) {
+        return isNull ? null : new Cell();
+    }
+
+    private static void setOn(Cell cell, Object value) {
+        cell.set(value);
+    }
+
+    enum InitInHandler {
+        A,
+        B
+    }
+
+    @Test
+    public void exceptionHandlerSeesParameterBeforeNullCheck() {
+        var key = newKey();
+        assertEquals("attached built", attachOrCancel(new WorkingBuilder(), key));
+        assertTrue(key.valid);
+        key = newKey();
+        assertEquals("cancelled: build failed", attachOrCancel(new FailingBuilder(), key));
+        assertFalse(key.valid);
+    }
+
+    @Test
+    public void exceptionHandlerSeesLocalBeforeNullCheck() {
+        assertEquals("attached built", assignAndAttach(new WorkingBuilder()));
+        assertEquals("key assigned: build failed", assignAndAttach(new FailingBuilder()));
+    }
+
+    @Test
+    public void repeatedFieldReadEliminationWithCatch() {
+        assertEquals(1, Holder.WARMUP);
+        assertEquals(7, readHolderValueAfterException());
+    }
+
+    @Test
+    public void negatingZeroFlipsSign() {
+        double[] doubles = { 0.0, -0.0 };
+        float[] floats = { 0f, -0f };
+        assertEquals(Double.NEGATIVE_INFINITY, 1 / -doubles[0], 0);
+        assertEquals(Double.POSITIVE_INFINITY, 1 / -doubles[1], 0);
+        assertEquals(Float.NEGATIVE_INFINITY, 1 / -floats[0], 0);
+        assertEquals(Float.POSITIVE_INFINITY, 1 / -floats[1], 0);
+    }
+
+    private static int readHolderValueAfterException() {
+        try {
+            Integer.parseInt("invalid");
+            return Holder.VALUE;
+        } catch (NumberFormatException e) {
+            return Holder.VALUE;
+        }
+    }
+
+    static class Holder {
+        static final int WARMUP = Integer.parseInt("1");
+        static final int VALUE = Integer.parseInt("7");
+    }
+
+    private static String attachOrCancel(Builder builder, Key key) {
+        try {
+            Object built = builder.build(key);
+            key.attach(built);
+            return "attached " + built;
+        } catch (IllegalStateException e) {
+            key.cancel();
+            return "cancelled: " + e.getMessage();
+        }
+    }
+
+    private static String assignAndAttach(Builder builder) {
+        Key key = null;
+        try {
+            key = newKey();
+            Object built = builder.build(key);
+            key.attach(built);
+            return "attached " + built;
+        } catch (IllegalStateException e) {
+            return (key != null ? "key assigned: " : "key not assigned: ") + e.getMessage();
+        }
+    }
+
+    private static final List<Key> KEYS = new ArrayList<>();
+
+    // The compiler cannot prove that the result is not null, so each call on it gets a null check
+    private static Key newKey() {
+        KEYS.add(new Key());
+        return KEYS.get(KEYS.size() - 1);
+    }
+
+    interface Builder {
+        Object build(Key key);
+    }
+
+    static class WorkingBuilder implements Builder {
+        @Override
+        public Object build(Key key) {
+            return "built";
+        }
+    }
+
+    static class FailingBuilder implements Builder {
+        @Override
+        public Object build(Key key) {
+            throw new IllegalStateException("build failed");
+        }
+    }
+
+    static class Key {
+        boolean valid = true;
+        Object attachment;
+
+        void attach(Object attachment) {
+            this.attachment = attachment;
+        }
+
+        void cancel() {
+            valid = false;
+        }
     }
 }

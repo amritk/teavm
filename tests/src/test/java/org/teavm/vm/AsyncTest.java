@@ -24,11 +24,13 @@ import java.util.function.IntSupplier;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.teavm.classlib.PlatformDetector;
+import org.teavm.compiler.bootstrap.junit.platform.BootstrapWasmGCTestPlatform;
 import org.teavm.interop.Async;
 import org.teavm.interop.AsyncCallback;
 import org.teavm.jso.browser.Window;
 import org.teavm.jso.core.JSPromise;
 import org.teavm.jso.core.JSString;
+import org.teavm.junit.AsyncEnabled;
 import org.teavm.junit.EachTestCompiledSeparately;
 import org.teavm.junit.OnlyPlatform;
 import org.teavm.junit.SkipJVM;
@@ -42,6 +44,7 @@ import org.teavm.runtime.EventQueue;
 @SkipJVM
 public class AsyncTest {
     @Test
+    @AsyncEnabled
     public void primitives() {
         assertEquals(23, getPrimitive());
     }
@@ -54,6 +57,7 @@ public class AsyncTest {
     }
 
     @Test
+    @AsyncEnabled
     @SkipPlatform(TestPlatform.C)
     public void jsObjects() {
         var str = getJsString();
@@ -62,6 +66,7 @@ public class AsyncTest {
     }
 
     @Test
+    @AsyncEnabled
     public void switchAsyncArgument() {
         var sb = new StringBuilder();
         for (var i = 0; i < 4; ++i) {
@@ -81,11 +86,13 @@ public class AsyncTest {
     }
 
     @Test
+    @AsyncEnabled
     public void doublePrimitive() {
         assertEquals(2.5, returnSamePrimitive(2.5), 0.01);
     }
 
     @Test
+    @AsyncEnabled
     public void conditionalBranch() {
         var list = List.of(1, 2);
         var sb = new StringBuilder();
@@ -96,6 +103,7 @@ public class AsyncTest {
     }
 
     @Test
+    @AsyncEnabled
     public void conditionalBranchOfDistinctTypesBeforeSuspension() {
         var sb = new StringBuilder();
         for (var i = 0; i < 2; ++i) {
@@ -112,6 +120,7 @@ public class AsyncTest {
     }
 
     @Test
+    @AsyncEnabled
     public void constantBeneathSuspendingConditional() {
         var sb = new StringBuilder();
         for (var i = 0; i < 2; ++i) {
@@ -125,11 +134,30 @@ public class AsyncTest {
     }
 
     @Test
+    @AsyncEnabled
+    public void arraysAndObjectsLiveAcrossSuspension() {
+        var floats = new float[] { 1.5f, 2.5f };
+        var matrix = new int[][] { { 3 }, { 4, 5 } };
+        var flags = new boolean[] { true };
+        var strings = new String[] { "a", "b" };
+        var sb = new StringBuilder("foo");
+        Object nothing = null;
+        assertEquals(23, getPrimitive());
+        assertEquals(4f, floats[0] + floats[1], 0.01f);
+        assertEquals(5, matrix[1][1]);
+        assertEquals(true, flags[0]);
+        assertEquals("ab", strings[0] + strings[1]);
+        assertEquals("foo", sb.append(nothing == null ? "" : "!").toString());
+    }
+
+    @Test
+    @AsyncEnabled
     public void passStringConstant() {
         assertEquals("foo", returnSamePrimitive("foo"));
     }
 
     @Test
+    @AsyncEnabled
     public void collectionAddAll() {
         var list = new ArrayList<>() {
             @Override
@@ -165,6 +193,7 @@ public class AsyncTest {
     }
 
     @Test
+    @AsyncEnabled
     @SkipPlatform(TestPlatform.C)
     public void awaitPromise() {
         var promise = new JSPromise<String>((resolve, _) -> {
@@ -174,7 +203,8 @@ public class AsyncTest {
     }
 
     @Test
-    @OnlyPlatform({ TestPlatform.JAVASCRIPT, TestPlatform.WEBASSEMBLY_GC })
+    @AsyncEnabled
+    @OnlyPlatform({ TestPlatform.JAVASCRIPT, TestPlatform.WEBASSEMBLY_GC, BootstrapWasmGCTestPlatform.ID })
     public void suspendFunctionFromJs() {
         assertEquals(23, wrapWithJsCall(() -> perhapsSuspend(false, 23)));
         assertThrows(RuntimeException.class, () -> wrapWithJsCall(() -> perhapsSuspend(true, 42)));

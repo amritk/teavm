@@ -129,17 +129,31 @@ public class ExportTest {
     public void exportedClassInheritance() {
         testExport("exportClassInheritance", ModuleWithClassInheritance.class);
     }
+
+    @Test
+    public void exitFromJsCall() {
+        testExport("exitFromJsCall", ModuleWithExit.class, true);
+    }
+
+    @Test
+    public void exitFromThread() {
+        testExport("exitFromThread", ModuleWithExit.class, true);
+    }
     
     private void testExport(String name, Class<?> moduleClass) {
+        testExport(name, moduleClass, false);
+    }
+
+    private void testExport(String name, Class<?> moduleClass, boolean asyncEnabled) {
         if (jsNeeded) {
-            testExportJs(name, moduleClass);
+            testExportJs(name, moduleClass, asyncEnabled);
         }
         if (wasmGCNeeded) {
-            testExportWasmGC(name, moduleClass);
+            testExportWasmGC(name, moduleClass, asyncEnabled);
         }
     }
 
-    private void testExportJs(String name, Class<?> moduleClass) {
+    private void testExportJs(String name, Class<?> moduleClass, boolean asyncEnabled) {
         try {
             var jsTarget = new JavaScriptTarget();
             jsTarget.setModuleType(JSModuleType.ES2015);
@@ -149,6 +163,7 @@ public class ExportTest {
             teavm.installPlugins();
             teavm.setEntryPoint(moduleClass.getName());
             teavm.setOptimizationLevel(TeaVMOptimizationLevel.ADVANCED);
+            teavm.setAsyncEnabled(asyncEnabled);
             outputDir.mkdirs();
             teavm.build(outputDir, "test.js");
             if (!teavm.getProblemProvider().getSevereProblems().isEmpty()) {
@@ -167,6 +182,10 @@ public class ExportTest {
             var testProviderFile = new File(outputDir, "provider.js");
             try (var writer = new OutputStreamWriter(new FileOutputStream(testProviderFile), StandardCharsets.UTF_8)) {
                 writer.write("import * as obj from '/tests/" + name + "/test.js';\n");
+                writer.write("export const exitCodes = [];\n");
+                writer.write("export const ExitError = obj.teavmRuntime?.ExitError;\n");
+                writer.write("export const killedWithCode = () => obj.teavmRuntime.killedWithCode;\n");
+                writer.write("obj.teavmRuntime?.setExitHandler(code => exitCodes.push(code));\n");
                 writer.write("export default Promise.resolve(obj);");
             }
 
@@ -178,7 +197,7 @@ public class ExportTest {
         }
     }
 
-    private void testExportWasmGC(String name, Class<?> moduleClass) {
+    private void testExportWasmGC(String name, Class<?> moduleClass, boolean asyncEnabled) {
         try {
             var wasmGCTarget = new WasmGCTarget();
             wasmGCTarget.setObfuscated(false);
@@ -189,6 +208,7 @@ public class ExportTest {
             teavm.installPlugins();
             teavm.setEntryPoint(moduleClass.getName());
             teavm.setOptimizationLevel(TeaVMOptimizationLevel.ADVANCED);
+            teavm.setAsyncEnabled(asyncEnabled);
             outputDir.mkdirs();
             teavm.build(outputDir, "test.wasm");
             if (!teavm.getProblemProvider().getSevereProblems().isEmpty()) {
@@ -214,8 +234,14 @@ public class ExportTest {
             }
             var testProviderFile = new File(outputDir, "provider.js");
             try (var writer = new OutputStreamWriter(new FileOutputStream(testProviderFile), StandardCharsets.UTF_8)) {
-                writer.write("import { load } from '/resources/org/teavm/backend/wasm/wasm-gc-module-runtime.js';\n");
-                writer.write("let teavm = await load('/tests/" + name + "/test.wasm');\n");
+                var runtimePath = "/resources/org/teavm/backend/wasm/wasm-gc-module-runtime.js";
+                writer.write("import { load } from '" + runtimePath + "';\n");
+                writer.write("export { ExitError } from '" + runtimePath + "';\n");
+                writer.write("export const exitCodes = [];\n");
+                writer.write("let teavm = await load('/tests/" + name + "/test.wasm', {\n");
+                writer.write("  onExit: code => exitCodes.push(code)\n");
+                writer.write("});\n");
+                writer.write("export const killedWithCode = () => teavm.killedWithCode;\n");
                 writer.write("export default teavm.exports;\n");
             }
 

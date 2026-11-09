@@ -83,6 +83,7 @@ import org.teavm.backend.c.intrinsic.ShadowStackIntrinsic;
 import org.teavm.backend.c.intrinsic.StringIntrinsic;
 import org.teavm.backend.c.intrinsic.StringsIntrinsic;
 import org.teavm.backend.c.intrinsic.StructureIntrinsic;
+import org.teavm.backend.c.intrinsic.SystemIntrinsic;
 import org.teavm.backend.c.intrinsic.reflection.AnnotationConstructorIntrinsic;
 import org.teavm.backend.c.intrinsic.reflection.AnnotationDataIntrinsic;
 import org.teavm.backend.c.intrinsic.reflection.AnnotationInfoIntrinsic;
@@ -155,6 +156,7 @@ import org.teavm.model.lowlevel.WriteBarrierInsertion;
 import org.teavm.model.optimization.InliningFilterFactory;
 import org.teavm.model.transformation.BoundCheckInsertion;
 import org.teavm.model.transformation.ClassPatch;
+import org.teavm.model.transformation.DivisionCheckInsertion;
 import org.teavm.model.transformation.NullCheckInsertion;
 import org.teavm.model.util.AsyncMethodFinder;
 import org.teavm.model.util.DefaultVariableCategoryProvider;
@@ -206,6 +208,8 @@ public class CTarget implements TeaVMTarget, TeaVMCHost {
     private WriteBarrierInsertion writeBarrierInsertion;
     private NullCheckInsertion nullCheckInsertion;
     private BoundCheckInsertion boundCheckInsertion = new BoundCheckInsertion();
+    private DivisionCheckInsertion divisionCheckInsertion = new DivisionCheckInsertion();
+    private boolean strict;
     private ExportDependencyListener exportDependencyListener = new ExportDependencyListener();
     private int minHeapSize = 4 * 1024 * 1024;
     private int maxHeapSize = 128 * 1024 * 1024;
@@ -254,6 +258,14 @@ public class CTarget implements TeaVMTarget, TeaVMCHost {
 
     public void setObfuscated(boolean obfuscated) {
         this.obfuscated = obfuscated;
+    }
+
+    /**
+     * Enables checks that are not necessary for keeping heap consistent, like division by zero checks.
+     * Null and array bound checks are always performed, since without them generated code can damage heap.
+     */
+    public void setStrict(boolean strict) {
+        this.strict = strict;
     }
 
     public void setFileNames(FileNameProvider fileNames) {
@@ -313,6 +325,11 @@ public class CTarget implements TeaVMTarget, TeaVMCHost {
 
     @Override
     public void contributeDependencies(DependencyAnalyzer dependencyAnalyzer) {
+        BoundCheckInsertion.contributeDependencies(dependencyAnalyzer);
+        NullCheckInsertion.contributeDependencies(dependencyAnalyzer);
+        if (strict) {
+            DivisionCheckInsertion.contributeDependencies(dependencyAnalyzer);
+        }
         dependencyAnalyzer.linkMethod(new MethodReference(Class.class, "createClass", ClassInfo.class, Class.class))
                 .use();
 
@@ -337,9 +354,8 @@ public class CTarget implements TeaVMTarget, TeaVMCHost {
                 void.class)).use();
         dependencyAnalyzer.linkMethod(new MethodReference(ExceptionHandling.class,
                 "throwArrayIndexOutOfBoundsException", void.class)).use();
-        dependencyAnalyzer.linkMethod(new MethodReference(NullPointerException.class, "<init>", void.class))
-                .propagateClass(0, NullPointerException.class.getName())
-                .use();
+        dependencyAnalyzer.linkMethod(new MethodReference(ExceptionHandling.class,
+                "throwArithmeticException", void.class)).use();
 
         dependencyAnalyzer.linkMethod(new MethodReference(ExceptionHandling.class, "catchException",
                 Throwable.class)).use();
@@ -408,6 +424,9 @@ public class CTarget implements TeaVMTarget, TeaVMCHost {
     @Override
     public void beforeOptimizations(Program program, MethodReader method) {
         boundCheckInsertion.transformProgram(program, method.getReference());
+        if (strict) {
+            divisionCheckInsertion.transformProgram(program, method.getReference());
+        }
     }
 
     @Override
@@ -449,6 +468,7 @@ public class CTarget implements TeaVMTarget, TeaVMCHost {
         intrinsics.add(new FiberIntrinsic());
         intrinsics.add(new LongIntrinsic());
         intrinsics.add(new IntegerIntrinsic());
+        intrinsics.add(new SystemIntrinsic());
         intrinsics.add(new StringsIntrinsic());
         intrinsics.add(new ConsoleIntrinsic());
         intrinsics.add(new CResourcesIntrinsic());
@@ -484,7 +504,8 @@ public class CTarget implements TeaVMTarget, TeaVMCHost {
         generators.add(new WeakReferenceGenerator());
         generators.add(new ReferenceQueueGenerator());
         generators.add(new CResourcesGenerator(controller.getProperties(), controller.getResourceProvider(),
-                controller.getClassLoader(), controller.extensionEnvironment()));
+                controller.getClassLoader(), controller.extensionEnvironment(),
+                controller.extensionPolicies()));
 
         var reflectionGenerators = new ArrayList<ReflectionGenerator>();
 

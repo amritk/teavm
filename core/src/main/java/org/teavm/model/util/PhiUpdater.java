@@ -102,6 +102,34 @@ public class PhiUpdater {
     private Predicate<Instruction> sigmaPredicate = instruction -> false;
     private int[][][] frontierVariableCache;
     private Variable[][] pendingVariableMap;
+    private RenamingListener renamingListener;
+
+    /**
+     * Receives notifications during variable renaming, which walks the dominator tree, so blocks are not
+     * visited in index order. Each basic block is visited once.
+     */
+    public interface RenamingListener {
+        /**
+         * Called right after the instruction has been renamed, i.e. after its definitions are applied.
+         * At this point {@link #getCurrentVersion(int)} gives the version of each original variable
+         * that is visible after the instruction.
+         */
+        void instructionRenamed(Instruction instruction);
+    }
+
+    public void setRenamingListener(RenamingListener renamingListener) {
+        this.renamingListener = renamingListener;
+    }
+
+    /**
+     * Returns current version of the given original variable. Only valid inside
+     * {@link RenamingListener} callbacks.
+     *
+     * @return current version or {@code null} if the variable is not defined at this point.
+     */
+    public Variable getCurrentVersion(int sourceVariable) {
+        return sourceVariable < variableMap.length ? variableMap[sourceVariable] : null;
+    }
 
     public int getSourceVariable(int var) {
         if (var >= variableToSourceMap.size()) {
@@ -172,7 +200,7 @@ public class PhiUpdater {
         }
 
         estimateSigmas();
-        estimatePhis();
+        estimatePhis(parameters.length);
         renameVariables();
         propagatePhiUsageInformation();
         addSynthesizedPhis();
@@ -216,11 +244,16 @@ public class PhiUpdater {
         }
     }
 
-    private void estimatePhis() {
+    private void estimatePhis(int parameterCount) {
         calculateDefinitions();
 
         DefinitionExtractor definitionExtractor = new DefinitionExtractor();
         variableDefined = new boolean[program.variableCount()];
+        // Parameters are defined on entry, so their first redefinition inside a protected block
+        // must also introduce phi in exception handler, which receives the original value
+        for (int i = 0; i < parameterCount; ++i) {
+            variableDefined[i] = true;
+        }
 
         IntDeque stack = new IntArrayDeque();
         stack.addLast(0);
@@ -322,8 +355,15 @@ public class PhiUpdater {
                 phi.setReceiver(define(phi.getReceiver()));
             }
 
-            for (Instruction insn : currentBlock) {
-                insn.acceptVisitor(consumer);
+            if (renamingListener != null) {
+                for (var insn : currentBlock) {
+                    insn.acceptVisitor(consumer);
+                    renamingListener.instructionRenamed(insn);
+                }
+            } else {
+                for (var insn : currentBlock) {
+                    insn.acceptVisitor(consumer);
+                }
             }
 
             int[] successors = domGraph.outgoingEdges(index);
@@ -435,10 +475,25 @@ public class PhiUpdater {
         }
 
         for (var phi : program.basicBlockAt(successor).getPhis()) {
-            for (var incoming : phi.getIncomings()) {
+            var incomings = phi.getIncomings();
+            var incomingCount = incomings.size();
+            for (var i = 0; i < incomingCount; ++i) {
+                var incoming = incomings.get(i);
                 if (incoming.getSource() == currentBlock) {
                     var value = variableMap[incoming.getValue().getIndex()];
                     if (value != null) {
+                        // An exception can leave the block before any later version is assigned,
+                        // so the handler needs every version
+                        var versions = allVersions ? definedVersions.get(incoming.getValue().getIndex()) : null;
+                        if (versions != null) {
+                            for (var version : versions) {
+                                var versionIncoming = new Incoming();
+                                versionIncoming.setSource(currentBlock);
+                                versionIncoming.setValue(version);
+                                incomings.add(versionIncoming);
+                                usedPhis.set(version.getIndex());
+                            }
+                        }
                         incoming.setValue(value);
                         usedPhis.set(value.getIndex());
                     } else {

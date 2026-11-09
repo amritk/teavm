@@ -19,12 +19,15 @@ import org.teavm.classlib.PlatformDetector;
 import org.teavm.interop.Async;
 import org.teavm.interop.AsyncCallback;
 import org.teavm.platform.Platform;
-import org.teavm.platform.PlatformRunnable;
 import org.teavm.runtime.EventQueue;
 import org.teavm.runtime.Fiber;
 
 public class TThread extends TObject implements TRunnable {
-    /** One thread, always running; the other states exist so switches compile. */
+    /**
+     * Only RUNNABLE and TERMINATED are ever reported: a thread does not record
+     * whether it has been started or what it is blocked on. The other states
+     * exist so that switches over them compile.
+     */
     public enum State {
         NEW,
         RUNNABLE,
@@ -35,7 +38,7 @@ public class TThread extends TObject implements TRunnable {
     }
 
     public State getState() {
-        return State.RUNNABLE;
+        return alive ? State.RUNNABLE : State.TERMINATED;
     }
 
     private static TThread mainThread = new TThread("main");
@@ -163,29 +166,24 @@ public class TThread extends TObject implements TRunnable {
     }
 
     public static void yield() {
-        // Single-threaded build: there is no other thread to yield to, so this
-        // is a no-op rather than a context switch. Calling switchContext here
-        // would be @Async, and async-ness propagates to every caller through a
-        // call graph that includes exception construction and virtual toString,
-        // which reaches practically the whole program - see patches/README.md.
+        TThread currentThread = currentThread();
+        if (++currentThread.yieldCount < 30) {
+            return;
+        }
         currentThread().yieldCount = 0;
+        if (currentThread.timeSliceStart + 100 < System.currentTimeMillis()) {
+            switchContext(currentThread);
+        }
     }
 
     @Async
     static native void switchContext(TThread thread);
 
     private static void switchContext(final TThread thread, final AsyncCallback<Void> callback) {
-        if (PlatformDetector.isLowLevel() || PlatformDetector.isWebAssemblyGC()) {
-            EventQueue.offer(() -> {
-                setCurrentThread(thread);
-                callback.complete(null);
-            });
-        } else {
-            Platform.postpone(() -> {
-                setCurrentThread(thread);
-                callback.complete(null);
-            });
-        }
+        EventQueue.offer(() -> {
+            setCurrentThread(thread);
+            callback.complete(null);
+        });
     }
 
     public void interrupt() {
@@ -223,32 +221,21 @@ public class TThread extends TObject implements TRunnable {
         return TObject.holdsLock(obj);
     }
 
-    // Single-threaded build: nothing else can run while this thread waits, so
-    // there is nothing to wait for and the event queue that would wake it never
-    // gets a turn. Returning immediately is what a sleep in a program with no
-    // other work amounts to. Not @Async - see patches/README.md for why one
-    // reachable @Async method makes a third of the program a coroutine.
-    public static void sleep(long millis) throws TInterruptedException {
-    }
+    @Async
+    public static native void sleep(long millis) throws TInterruptedException;
 
     private static void sleep(long millis, AsyncCallback<Void> callback) {
         TThread current = currentThread();
         SleepHandler handler = new SleepHandler(current, callback);
-        if (PlatformDetector.isLowLevel() || PlatformDetector.isWebAssemblyGC()) {
-            if (current.interruptedFlag) {
-                handler.interrupted();
-            } else {
-                handler.scheduleId = EventQueue.offer(handler, System.currentTimeMillis() + millis);
-                current.interruptHandler = handler;
-            }
+        if (current.interruptedFlag) {
+            handler.interrupted();
         } else {
-            int intMillis = millis < Integer.MAX_VALUE ? (int) millis : Integer.MAX_VALUE;
-            handler.scheduleId = Platform.schedule(handler, intMillis);
+            handler.scheduleId = EventQueue.offer(handler, System.currentTimeMillis() + millis);
             current.interruptHandler = handler;
         }
     }
 
-    static class SleepHandler implements PlatformRunnable, EventQueue.Event, TThreadInterruptHandler {
+    static class SleepHandler implements EventQueue.Event, TThreadInterruptHandler {
         private TThread thread;
         private AsyncCallback<Void> callback;
         private boolean isInterrupted;
@@ -263,13 +250,8 @@ public class TThread extends TObject implements TRunnable {
         public void interrupted() {
             thread.interruptedFlag = false;
             isInterrupted = true;
-            if (PlatformDetector.isLowLevel() || PlatformDetector.isWebAssemblyGC()) {
-                EventQueue.kill(scheduleId);
-                EventQueue.offer(() -> callback.error(new TInterruptedException()));
-            } else {
-                Platform.killSchedule(scheduleId);
-                Platform.postpone(() -> callback.error(new TInterruptedException()));
-            }
+            EventQueue.kill(scheduleId);
+            EventQueue.offer(() -> callback.error(new TInterruptedException()));
         }
 
         @Override

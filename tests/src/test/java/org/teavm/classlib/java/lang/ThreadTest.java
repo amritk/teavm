@@ -22,9 +22,11 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.teavm.junit.AsyncEnabled;
 import org.teavm.junit.EachTestCompiledSeparately;
 import org.teavm.junit.TeaVMTest;
 
+@AsyncEnabled
 @TeaVMTest
 @EachTestCompiledSeparately
 public class ThreadTest {
@@ -57,6 +59,29 @@ public class ThreadTest {
             assertFalse(mainThread.isInterrupted());
             assertTrue(end - start < 5000, "Wait time " + (end - start));
         }
+    }
+
+    @Test
+    public void sleepAfterInterruptedSleep() throws InterruptedException {
+        var mainThread = Thread.currentThread();
+        new Thread(() -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                // ok
+            }
+            mainThread.interrupt();
+        }).start();
+        try {
+            Thread.sleep(5000);
+            fail("Exception expected");
+        } catch (InterruptedException e) {
+            // expected
+        }
+        // A later suspension on the same thread must not throw the earlier exception again.
+        long start = System.currentTimeMillis();
+        Thread.sleep(20);
+        assertTrue(System.currentTimeMillis() - start >= 20);
     }
 
     @Test

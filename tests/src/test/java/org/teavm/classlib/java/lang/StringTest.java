@@ -22,8 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.UnsupportedEncodingException;
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
+import org.teavm.compiler.bootstrap.junit.platform.BootstrapWasmGCTestPlatform;
 import org.teavm.junit.EachTestCompiledSeparately;
 import org.teavm.junit.SkipPlatform;
 import org.teavm.junit.TeaVMTest;
@@ -253,6 +256,15 @@ public class StringTest {
     }
 
     @Test
+    public void isBlankWorks() {
+        assertTrue("".isBlank());
+        assertTrue("  ".isBlank());
+        assertTrue("\t\n \u2008\r\f".isBlank());
+        assertFalse(" a ".isBlank());
+        assertFalse("\u00A0".isBlank());
+    }
+
+    @Test
     public void convertedToCharArray() {
         char[] array = "123".toCharArray();
         assertEquals(3, array.length);
@@ -337,7 +349,7 @@ public class StringTest {
     private String turkish = "istanbul";
 
     @Test
-    @SkipPlatform({ TestPlatform.C, TestPlatform.WEBASSEMBLY_GC })
+    @SkipPlatform({ TestPlatform.C, TestPlatform.WEBASSEMBLY_GC, BootstrapWasmGCTestPlatform.ID })
     public void convertsCaseLocaled() {
         assertEquals(turkish, "İstanbul".toLowerCase(new Locale("tr", "TR")));
         assertEquals(common, "İstanbul".toLowerCase(Locale.US));
@@ -408,6 +420,19 @@ public class StringTest {
     }
     
     @Test
+    public void lines() {
+        assertEquals(List.of(), "".lines().collect(Collectors.toList()));
+        assertEquals(List.of("abc"), "abc".lines().collect(Collectors.toList()));
+        assertEquals(List.of("abc"), "abc\n".lines().collect(Collectors.toList()));
+        assertEquals(List.of(""), "\n".lines().collect(Collectors.toList()));
+        assertEquals(List.of("", ""), "\n\n".lines().collect(Collectors.toList()));
+        assertEquals(List.of("a", "b", "", "c", "d"), "a\nb\r\n\rc\rd\r\n".lines().collect(Collectors.toList()));
+        assertEquals(List.of(" a ", "\t"), " a \r\t".lines().collect(Collectors.toList()));
+        assertEquals(List.of("a"), "a\nb\nc".lines().limit(1).collect(Collectors.toList()));
+        assertEquals(2, "a\n\nb".lines().filter(l -> !l.isEmpty()).count());
+    }
+
+    @Test
     public void translateEscapes() {
         assertEquals("abc", "abc".translateEscapes());
         assertEquals("\n\r\t\n", "\\n\\r\\t\\12".translateEscapes());
@@ -422,20 +447,5 @@ public class StringTest {
         assertEquals("abc\n\ndef\n", " abc\r\n \n def\r ".stripIndent());
         assertEquals("", " ".stripIndent());
         assertEquals("\n", " \n ".stripIndent());
-    }
-
-    @Test
-    public void lines() {
-        assertArrayEquals(new String[] { "a", "b" }, "a\nb".lines().toArray(String[]::new));
-        assertArrayEquals(new String[] { "a", "b" }, "a\r\nb".lines().toArray(String[]::new));
-        assertArrayEquals(new String[] { "a", "b" }, "a\rb".lines().toArray(String[]::new));
-        // A terminator ends the last line rather than starting an empty one.
-        assertArrayEquals(new String[] { "a", "b" }, "a\nb\n".lines().toArray(String[]::new));
-        // Empty lines are lines, including a leading one.
-        assertArrayEquals(new String[] { "", "b" }, "\nb".lines().toArray(String[]::new));
-        assertArrayEquals(new String[] { "a", "", "b" }, "a\n\nb".lines().toArray(String[]::new));
-        assertArrayEquals(new String[0], "".lines().toArray(String[]::new));
-        assertArrayEquals(new String[] { "" }, "\n".lines().toArray(String[]::new));
-        assertArrayEquals(new String[] { "a" }, "a".lines().toArray(String[]::new));
     }
 }

@@ -137,8 +137,8 @@ public class ReflectionDependencyListener extends AbstractDependencyListener {
     private DependencyNode typesInThrownNode;
     private DependencyNode typesInGenericReflectableSignaturesNode;
     private Set<MethodReference> virtualMethods = new HashSet<>();
-    private Set<MethodReference> virtualCallSites = new HashSet<>();
-    private Set<String> classesFoundByName = new HashSet<>();
+    private Set<MethodReference> virtualCallSites = new LinkedHashSet<>();
+    private Set<String> classesFoundByName = new LinkedHashSet<>();
     private Set<MethodReference> calledMethods = new HashSet<>();
     private Set<FieldReference> readFields = new HashSet<>();
     private Set<FieldReference> writtenFields = new HashSet<>();
@@ -198,7 +198,8 @@ public class ReflectionDependencyListener extends AbstractDependencyListener {
         typesInReflectableSignaturesNode = agent.createNode();
         typesInThrownNode = agent.createNode();
         typesInGenericReflectableSignaturesNode = agent.createNode();
-        reflectionSuppliers.add(new DefaultReflectionSupplier(agent.extensionEnvironment()));
+        reflectionSuppliers.add(new DefaultReflectionSupplier(agent.extensionEnvironment(),
+                agent.extensionPolicies()));
 
         agent.linkMethod(new MethodReference(ClassInfo.class, "classObject", Class.class))
                 .getResult().propagate(agent.getType(ValueType.parse(Class.class)));
@@ -502,7 +503,7 @@ public class ReflectionDependencyListener extends AbstractDependencyListener {
     }
 
     void addAccessibleMethod(MethodReference method) {
-        accessibleMethodCache.computeIfAbsent(method.getClassName(), k -> new HashSet<>())
+        accessibleMethodCache.computeIfAbsent(method.getClassName(), k -> new LinkedHashSet<>())
                 .add(method.getDescriptor());
     }
 
